@@ -57,6 +57,9 @@ import '../../services/danmaku/danmaku_query.dart';
 import '../../services/danmaku/danmaku_service.dart';
 import '../../services/danmaku/danmaku_settings.dart';
 import '../../services/subtitle/subtitle_models.dart';
+import '../../services/lan/flow_client.dart';
+import '../../services/lan/flow_payload.dart';
+import '../../services/lan/lan_discovery.dart';
 import '../widgets/dlna_cast_sheet.dart';
 import '../widgets/subtitle_panel.dart';
 import '../widgets/video_download_dialog.dart';
@@ -66,6 +69,7 @@ import '../widgets/drive_login_prompt.dart';
 part 'player/cast_part.dart';
 part 'player/danmaku_part.dart';
 part 'player/download_part.dart';
+part 'player/flow_part.dart';
 part 'player/party_part.dart';
 part 'player/playback_part.dart';
 
@@ -500,6 +504,11 @@ class _PlayerPageState extends State<PlayerPage>
           _cursorVisible = false;
         });
       }
+    });
+    // 设备流转要靠它判断「是否正在播放」，决定直接播还是先弹确认。
+    // 用 postFrame 是因为 initState 里还不能安全地 notifyListeners。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _app.isPlayingSomething = true;
     });
     MpvExtension.instance.isInstalled.then((value) {
       if (mounted) setState(() => _mpvReady = value);
@@ -2437,6 +2446,8 @@ class _PlayerPageState extends State<PlayerPage>
 
   @override
   void dispose() {
+    // 离开播放器：清掉「正在播放」标志，流转进来时就不会再弹打断确认。
+    _app.isPlayingSomething = false;
     // 离开播放器即作废睡眠定时器：它的作用域就是这一集，不该在后台继续倒计时。
     _sleepTimer.dispose();
     _bufferingHintTimer?.cancel();
@@ -3852,6 +3863,24 @@ class _PlayerPageState extends State<PlayerPage>
                                 ),
                               ),
                             ),
+                            // 设备流转：把这一集推给局域网内另一台 MisaTV。
+                            // 桌面 + 移动端都提供（用户要求全平台互通）。
+                            if (!_live)
+                              TextButton.icon(
+                                onPressed: _flowToDevice,
+                                icon: const Icon(
+                                  Icons.devices_rounded,
+                                  color: Colors.white70,
+                                  size: 18,
+                                ),
+                                label: const Text(
+                                  '流转',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../core/logging/app_log.dart';
 import '../core/logging/log_redact.dart';
@@ -36,6 +37,8 @@ import '../services/artwork/artwork_service.dart';
 import '../services/jvm/jvm_runtime.dart';
 import '../services/jar_spider/spider_failure.dart';
 import '../services/jar_spider/warmup_plan.dart';
+import '../services/lan/flow_payload.dart';
+import '../services/lan/lan_discovery.dart';
 import '../services/lan/lan_server.dart';
 import '../services/media/local_media_service.dart';
 import '../services/media/media_server_service.dart';
@@ -177,7 +180,56 @@ class AppState extends ChangeNotifier {
     token: () => syncSettings.lanToken,
     snapshot: buildSyncBundle,
     apply: applySyncBundle,
+    onFlow: _onFlowReceived,
+    devicePlatform: () => flowDevicePlatform,
   );
+
+  /// 局域网设备发现（UDP 广播）。只有用户打开「设备流转」时才启动，
+  /// 避免平时无谓地占用 9981 端口与发广播。
+  ///
+  /// `deviceId` 用同步设置里持久化的设备 ID，重启后保持一致，对端才能正确去重。
+  late final LanDiscovery lanDiscovery = LanDiscovery(
+    deviceId: syncSettings.deviceId,
+    deviceName: () => syncDeviceName,
+  );
+
+  /// 本机平台标识，流转列表里显示图标用。
+  String get flowDevicePlatform {
+    if (kIsWeb) return 'web';
+    return defaultTargetPlatform.name;
+  }
+
+  /// 收到别的设备推来的流转。
+  ///
+  /// 这里只做「接受」：真正的播放在 UI 层（需要 context 才能推路由），
+  /// 通过 [onFlowRequest] 回调交给界面，界面接住后播完再回来。
+  Future<FlowAck> _onFlowReceived(FlowPayload payload) async {
+    final handler = onFlowRequest;
+    if (handler == null) {
+      return const FlowAck(accepted: false, message: '当前设备未就绪，稍后再试');
+    }
+    try {
+      final message = await handler(payload);
+      if (message == null) {
+        return const FlowAck(accepted: true);
+      }
+      return FlowAck(accepted: false, message: message);
+    } catch (e) {
+      AppLog.w('lan', '处理设备流转失败', e);
+      return FlowAck(accepted: false, message: '接收失败：$e');
+    }
+  }
+
+  /// 收到流转时的实际处理器，由 UI 层注入（它需要 context 打开播放器）。
+  /// 返回 null 表示已接受并开始播放；返回字符串表示拒绝原因。
+  Future<String?> Function(FlowPayload payload)? onFlowRequest;
+
+  /// 当前是否有播放器页面处于打开状态。
+  ///
+  /// 设备流转要用它决定「直接播」还是「先弹确认」：正在看片时被别人的流转
+  /// 打断体验很差。播放器页在 initState / dispose 里设置与清除。
+  bool isPlayingSomething = false;
+
 
   /// 「一起看」房间状态（房主 / 观众）。
   late final WatchPartyService watchParty = WatchPartyService(
@@ -963,6 +1015,11 @@ class AppState extends ChangeNotifier {
     videoDownloads.loadIfNeeded();
     if (syncSettings.lanToken.trim().isEmpty) {
       syncSettings = syncSettings.copyWith(lanToken: newSyncPairingToken());
+      unawaited(store.saveSyncSettings(syncSettings));
+    }
+    // 设备流转的稳定标识：旧档案没有，首次加载时生成并落盘。
+    if (syncSettings.deviceId.trim().isEmpty) {
+      syncSettings = syncSettings.ensureDeviceId();
       unawaited(store.saveSyncSettings(syncSettings));
     }
     localLives = store.loadLocalLives();
@@ -4273,6 +4330,57 @@ class AppState extends ChangeNotifier {
   }
 
   Future<List<String>> lanSyncAddresses() => lanServer.lanAddresses();
+
+  // ---- 设备流转 ----
+
+  /// 设备流转是否已就绪（发现服务在跑）。
+  bool get flowReady => lanDiscovery.running;
+
+  /// 打开「设备流转」：启动局域网服务 + UDP 发现。
+  ///
+  /// 复用局域网同步服务的 HTTP 端口（`/flow` 与 `/sync` 同一个服务），
+  /// 所以这里只需要保证服务起来，并把端口告诉发现模块用于公告。
+  Future<void> startFlow() async {
+    try {
+      final port = await startLanSyncServer();
+      lanDiscovery
+        ..localPort = port
+        ..platform = flowDevicePlatform;
+      await lanDiscovery.start();
+      AppLog.i('lan', '设备流转已就绪：端口 $port');
+      notifyListeners();
+    } catch (e) {
+      AppLog.w('lan', '设备流转启动失败', e);
+      rethrow;
+    }
+  }
+
+  /// 关闭设备流转。正在播放不受影响，只是不再被发现、不再接收推送。
+  Future<void> stopFlow() async {
+    await lanDiscovery.stop();
+    notifyListeners();
+  }
+
+  /// 被推送的设备播完 / 退出播放后触发一次同步。
+  ///
+  /// 只在用户已配置 WebDAV 同步时执行：否则没有远端可写，调了也是白跑，
+  /// 而且会在没配同步的设备上刷出失败日志。
+  Future<bool> syncHistoryAfterFlow() async {
+    if (syncSettings.davServerId.trim().isEmpty) {
+      AppLog.i('lan', '未配置 WebDAV 同步，跳过流转后的历史同步');
+      return false;
+    }
+    try {
+      await syncViaWebDav(serverId: syncSettings.davServerId);
+      AppLog.i('lan', '流转结束，历史已同步一次');
+      return true;
+    } catch (e) {
+      // 同步失败不能影响播放结束流程。
+      AppLog.w('lan', '流转后的历史同步失败（不影响本地记录）', e);
+      return false;
+    }
+  }
+
 
   // ---- 媒体库 ----
 

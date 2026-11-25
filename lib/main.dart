@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'app.dart';
+import 'ui/flow_receiver.dart';
 import 'core/logging/app_log.dart';
 import 'core/net/app_http.dart';
 import 'core/net/proxy_runtime.dart';
@@ -144,6 +145,17 @@ Future<void> _bootstrap(List<String> args) async {
   // 播放失败时由 AppState 按需刷新网盘会话（夸克 `/member` 补发新 `__puus`）。
   sourceService.jar.refreshDriveSession = state.refreshDriveSession;
   await state.init();
+  // 设备流转接收端：别的设备推过来时用它打开播放器。
+  // 没有 context，靠全局 navigatorKey；未初始化时回调里会拒收并给出提示。
+  FlowReceiver.install(state, navigatorKey: appNavigatorKey);
+  // 自动恢复：上次开着流转的话，启动后重新开启发现（否则对端看不到本机）。
+  if (state.syncSettings.flowEnabled) {
+    unawaited(
+      state.startFlow().catchError((Object e) {
+        AppLog.w('lan', '启动时恢复设备流转失败：$e');
+      }),
+    );
+  }
   // 老板键 / 托盘：桌面端初始化；热键被占用等情况只记日志，不影响启动。
   //
   // 注意：托盘图标**不能**在这里同步创建。Windows 上原生托盘需要窗口与消息
