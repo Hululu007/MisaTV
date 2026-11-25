@@ -533,10 +533,10 @@ class _HomePageState extends State<HomePage> {
         const gridSpacing = 14.0;
         var maxExtent = 188.0;
         var mainExtent = 292.0;
-     final SliverGridDelegate gridDelegate;
-      if (columns >= 2) {
+       final SliverGridDelegate gridDelegate;
+        if (columns >= 2) {
           final gridWidth = maxContent - gridPadding * 2;
-                final extent = gridWidth > 0
+          final extent = gridWidth > 0
               ? (gridWidth - gridSpacing * (columns - 1)) / columns
               : 188.0;
           final cardWidth = extent > 0 ? extent : 188.0;
@@ -547,25 +547,25 @@ class _HomePageState extends State<HomePage> {
             mainAxisSpacing: 18,
           ); 
         } else {
-       if (!kIsWeb &&
-            defaultTargetPlatform == TargetPlatform.android &&
-            MediaQuery.orientationOf(context) == Orientation.portrait) {
-          // 安卓手机竖屏：自动模式下至少排 3 个封面，避免一行只有两张、
-          // 封面巨大且首屏只能看到两三部片。
-          final gridWidth = maxContent - gridPadding * 2;
-          if (gridWidth > 0) {
-            final extent = (gridWidth - gridSpacing * 2) / 3;
-            maxExtent = extent.clamp(96.0, 188.0);
-            mainExtent = maxExtent * 1.5 + 44;
+           if (!kIsWeb &&
+              defaultTargetPlatform == TargetPlatform.android &&
+              MediaQuery.orientationOf(context) == Orientation.portrait) {
+            // 安卓手机竖屏：自动模式下至少排 3 个封面，避免一行只有两张、
+            // 封面巨大且首屏只能看到两三部片。
+            final gridWidth = maxContent - gridPadding * 2;
+            if (gridWidth > 0) {
+              final extent = (gridWidth - gridSpacing * 2) / 3;
+              maxExtent = extent.clamp(96.0, 188.0);
+              mainExtent = maxExtent * 1.5 + 44;
+            }
           }
-        }
          gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: maxExtent,
           mainAxisExtent: mainExtent,
           crossAxisSpacing: gridSpacing,
           mainAxisSpacing: 18,
-             );   
-           }
+           );   
+         }
         return Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxContent),
