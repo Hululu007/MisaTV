@@ -3718,11 +3718,11 @@ class _PlayerPageState extends State<PlayerPage>
                           label: '音轨',
                           onTap: _showAudioTracks,
                         ),
-                      if (!_live)
+                      if (!_live && _isMobile) ...[
                         Tooltip(
                           message: _skipIntro > 0
-                              ? '点按以当前进度覆盖片头，长按清除${_skipInheritedFrom.isEmpty ? '' : '（来自$_skipInheritedFrom）'}'
-                              : '点按以当前进度设为片头',
+                              ? '点按以当前进度覆盖片头，长按精确调整/清除${_skipInheritedFrom.isEmpty ? '' : '（来自$_skipInheritedFrom）'}'
+                              : '点按以当前进度设为片头，长按精确设置',
                           child: _barAction(
                             icon: Icons.first_page_rounded,
                             label: _skipIntro > 0
@@ -3730,14 +3730,13 @@ class _PlayerPageState extends State<PlayerPage>
                                 : '片头',
                             active: _skipIntro > 0,
                             onTap: _markSkipIntroFromCurrent,
-                            onLongPress: _clearSkipIntro,
+                            onLongPress: _showSkipSettings,
                           ),
                         ),
-                      if (!_live)
                         Tooltip(
                           message: _skipOutro > 0
-                              ? '点按以当前剩余时长覆盖片尾，长按清除${_skipInheritedFrom.isEmpty ? '' : '（来自$_skipInheritedFrom）'}'
-                              : '点按以当前剩余时长设为片尾',
+                              ? '点按以当前剩余时长覆盖片尾，长按精确调整/清除${_skipInheritedFrom.isEmpty ? '' : '（来自$_skipInheritedFrom）'}'
+                              : '点按以当前剩余时长设为片尾，长按精确设置',
                           child: _barAction(
                             icon: Icons.last_page_rounded,
                             label: _skipOutro > 0
@@ -3745,9 +3744,19 @@ class _PlayerPageState extends State<PlayerPage>
                                 : '片尾',
                             active: _skipOutro > 0,
                             onTap: _markSkipOutroFromCurrent,
-                            onLongPress: _clearSkipOutro,
+                            onLongPress: _showSkipSettings,
                           ),
                         ),
+                        ] else if (!_live)
+                          Tooltip(
+                            message: '跳过片头 / 片尾：${_skipSummary()}',
+                            child: _barAction(
+                              icon: Icons.content_cut_rounded,
+                              label: '跳过',
+                              active: _skipIntro > 0 || _skipOutro > 0,
+                              onTap: _showSkipSettings,
+                              ),
+                            ),
                       _barAction(
                         icon: Icons.analytics_outlined,
                         label: '详情',
