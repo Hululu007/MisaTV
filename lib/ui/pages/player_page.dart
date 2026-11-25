@@ -3223,10 +3223,10 @@ class _PlayerPageState extends State<PlayerPage>
                                   children: [
                                     if (!_live)
                                       _roundButton(
-                                        icon: Icons.replay_10_rounded,
-                                        onTap: () => _seekBy(
-                                          const Duration(seconds: -10),
-                                        ),
+                                        icon: Icons.skip_previous_rounded,
+                                        onTap: _index > 0
+                                          ? () => _switchTo(_index - 1)
+                                        : null,
                                       ),
                                     if (!_live) const SizedBox(width: 22),
                                     _roundButton(
@@ -3239,10 +3239,10 @@ class _PlayerPageState extends State<PlayerPage>
                                     if (!_live) const SizedBox(width: 22),
                                     if (!_live)
                                       _roundButton(
-                                        icon: Icons.forward_10_rounded,
-                                        onTap: () => _seekBy(
-                                          const Duration(seconds: 10),
-                                        ),
+                                        icon: Icons.skip_next_rounded,
+                                        onTap: _index + 1 < _episodes.length
+                                          ? () => _switchTo(_index + 1)
+                                        : null,
                                       ),
                                   ],
                                 ),
@@ -3611,38 +3611,9 @@ class _PlayerPageState extends State<PlayerPage>
                 ],
               ),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                if (!_live)
-                  IconButton(
-                    tooltip: '上一集',
-                    onPressed: _index > 0 ? () => _switchTo(_index - 1) : null,
-                    icon: Icon(
-                      Icons.skip_previous_rounded,
-                      color: _index > 0 ? Colors.white : Colors.white24,
-                    ),
-                  ),
-                IconButton(
-                  tooltip: _playing ? '暂停' : '播放',
-                  onPressed: _togglePlay,
-                  icon: Icon(
-                    _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    color: Colors.white,
-                  ),
-                ),
-                if (!_live)
-                  IconButton(
-                    tooltip: '下一集',
-                    onPressed: _index + 1 < _episodes.length
-                        ? () => _switchTo(_index + 1)
-                        : null,
-                    icon: Icon(
-                      Icons.skip_next_rounded,
-                      color: _index + 1 < _episodes.length
-                          ? Colors.white
-                          : Colors.white24,
-                    ),
-                  ),
-                IconButton(
+              IconButton(
                   tooltip: '刷新（重新取流）',
                   onPressed: (_refreshing || _resolving)
                       ? null
@@ -3671,11 +3642,14 @@ class _PlayerPageState extends State<PlayerPage>
                   icon: Icon(_volumeIcon, color: Colors.white),
                 ),
                 Expanded(
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 2,
-                    children: [
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
                       if (!_live)
                         Tooltip(
                           message: '弹幕：点击开关，长按调节速度 / 屏占 / 屏蔽词',
@@ -3757,6 +3731,8 @@ class _PlayerPageState extends State<PlayerPage>
                           ),
                         ),
                       ),
+               ],
+                       ), ), ), ),
                 if (_isAndroid)
                   IconButton(
                     tooltip: _portraitFullscreen ? '横屏全屏' : '竖屏全屏',
@@ -3786,9 +3762,6 @@ class _PlayerPageState extends State<PlayerPage>
                           color: Colors.white,
                         ),
                       ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ],
@@ -3799,7 +3772,7 @@ class _PlayerPageState extends State<PlayerPage>
 
   Widget _roundButton({
     required IconData icon,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
     double size = 52,
   }) {
     return Material(
@@ -3811,7 +3784,10 @@ class _PlayerPageState extends State<PlayerPage>
         child: SizedBox(
           width: size,
           height: size,
-          child: Icon(icon, color: Colors.white, size: size * 0.5),
+          child: Icon(icon,
+                     color: onTap == null ? Colors.white24 : Colors.white,
+                     size: size * 0.5,
+                     ),
         ),
       ),
     );
