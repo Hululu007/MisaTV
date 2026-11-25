@@ -181,8 +181,9 @@ jobs:
             echo "::error::找不到 APK：$apk"
             exit 1
           fi
-          # apksigner 在 build-tools 里，随 SDK 一起装。
-          # ANDROID_SDK_ROOT 在 GitHub 的 runner 上不一定导出，逐个候选找。
+          # apksigner 在 build-tools/<ver>/bin/ 下（可执行脚本）。
+          # 注意必须限定到 bin/：build-tools 里还有 lib/apksigner.jar 同名文件，
+          # 用 `find -name 'apksigner*'` 会先抓到那个 jar，执行时报 126。
           sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
           if [ -z "$sdk" ] || [ ! -d "$sdk/build-tools" ]; then
             for cand in "$LOCALAPPDATA/Android/Sdk" "$ANDROID_HOME" "$ANDROID_SDK_ROOT" \
@@ -190,11 +191,12 @@ jobs:
               if [ -n "$cand" ] && [ -d "$cand/build-tools" ]; then sdk="$cand"; break; fi
             done
           fi
-          signer=$(find "$sdk/build-tools" -name 'apksigner*' -type f 2>/dev/null | sort -V | tail -1)
+          signer=$(find "$sdk/build-tools" -path '*/bin/apksigner' -type f 2>/dev/null | sort -V | tail -1)
           if [ -z "$signer" ]; then
             echo "::error::未找到 apksigner（sdk=$sdk）——这一步不能跳过，否则 debug 签名的包会直接发出去"
             exit 1
           fi
+          chmod +x "$signer" 2>/dev/null || true
           echo "使用 apksigner: $signer"
           info=$("$signer" verify --print-certs "$apk" 2>&1)
           echo "$info"
