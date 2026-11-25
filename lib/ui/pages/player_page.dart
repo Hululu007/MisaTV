@@ -3223,10 +3223,16 @@ class _PlayerPageState extends State<PlayerPage>
                                   children: [
                                     if (!_live)
                                       _roundButton(
-                                        icon: Icons.skip_previous_rounded,
-                                        onTap: _index > 0
-                                          ? () => _switchTo(_index - 1)
-                                        : null,
+                                        icon: _isMobile
+                                            ? Icons.skip_previous_rounded
+                                            : Icons.replay_10_rounded,
+                                        onTap: _isMobile
+                                            ? (_index > 0
+                                                ? () => _switchTo(_index - 1)
+                                                : null)
+                                            : () => _seekBy(
+                                                const Duration(seconds: -10),
+                                              ),
                                       ),
                                     if (!_live) const SizedBox(width: 22),
                                     _roundButton(
@@ -3239,10 +3245,16 @@ class _PlayerPageState extends State<PlayerPage>
                                     if (!_live) const SizedBox(width: 22),
                                     if (!_live)
                                       _roundButton(
-                                        icon: Icons.skip_next_rounded,
-                                        onTap: _index + 1 < _episodes.length
-                                          ? () => _switchTo(_index + 1)
-                                        : null,
+                                        icon: _isMobile
+                                            ? Icons.skip_next_rounded
+                                            : Icons.forward_10_rounded,
+                                        onTap: _isMobile
+                                            ? (_index + 1 < _episodes.length
+                                                ? () => _switchTo(_index + 1)
+                                                : null)
+                                            : () => _seekBy(
+                                                const Duration(seconds: 10),
+                                              ),
                                       ),
                                   ],
                                 ),
@@ -3613,6 +3625,37 @@ class _PlayerPageState extends State<PlayerPage>
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                if (!_isMobile && !_live)
+                  IconButton(
+                    tooltip: '上一集',
+                    onPressed: _index > 0 ? () => _switchTo(_index - 1) : null,
+                    icon: Icon(
+                      Icons.skip_previous_rounded,
+                      color: _index > 0 ? Colors.white : Colors.white24,
+                    ),
+                  ),
+                if (!_isMobile)
+                  IconButton(
+                    tooltip: _playing ? '暂停' : '播放',
+                    onPressed: _togglePlay,
+                    icon: Icon(
+                      _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      color: Colors.white,
+                    ),
+                  ),
+                if (!_isMobile && !_live)
+                  IconButton(
+                    tooltip: '下一集',
+                    onPressed: _index + 1 < _episodes.length
+                        ? () => _switchTo(_index + 1)
+                        : null,
+                    icon: Icon(
+                      Icons.skip_next_rounded,
+                      color: _index + 1 < _episodes.length
+                          ? Colors.white
+                          : Colors.white24,
+                    ),
+                  ),
               IconButton(
                   tooltip: '刷新（重新取流）',
                   onPressed: (_refreshing || _resolving)
