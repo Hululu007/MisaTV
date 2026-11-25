@@ -181,9 +181,12 @@ jobs:
             echo "::error::找不到 APK：$apk"
             exit 1
           fi
-          # apksigner 在 build-tools/<ver>/bin/ 下（可执行脚本）。
-          # 注意必须限定到 bin/：build-tools 里还有 lib/apksigner.jar 同名文件，
-          # 用 `find -name 'apksigner*'` 会先抓到那个 jar，执行时报 126。
+          # 在 build-tools 里定位 apksigner。实测 GitHub 的 ubuntu runner
+          # （SDK 37.0.0）布局与文档不同，三次踩坑：
+          #   1) `-name 'apksigner*'` 先匹配到 lib/apksigner.jar，执行报 126；
+          #   2) `-path '*/bin/apksigner' -type f` 找不到，bin/ 下压根没有它；
+          #   3) 实际可执行脚本在 build-tools/<ver>/apksigner（build-tools 根目录）。
+          # 所以按「根目录脚本 → bin 脚本 → java -jar」三级回退。
           sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
           if [ -z "$sdk" ] || [ ! -d "$sdk/build-tools" ]; then
             for cand in "$LOCALAPPDATA/Android/Sdk" "$ANDROID_HOME" "$ANDROID_SDK_ROOT" \
@@ -191,14 +194,25 @@ jobs:
               if [ -n "$cand" ] && [ -d "$cand/build-tools" ]; then sdk="$cand"; break; fi
             done
           fi
-          signer=$(find "$sdk/build-tools" -path '*/bin/apksigner' -type f 2>/dev/null | sort -V | tail -1)
-          if [ -z "$signer" ]; then
-            echo "::error::未找到 apksigner（sdk=$sdk）——这一步不能跳过，否则 debug 签名的包会直接发出去"
-            exit 1
+          bt=$(ls -d "$sdk"/build-tools/* 2>/dev/null | sort -V | tail -1)
+          echo "build-tools: $bt"
+
+          APKSIGNER_CMD=""
+          for cand in "$bt/apksigner" "$bt/bin/apksigner" "$bt/apksigner.bat" "$bt/bin/apksigner.bat"; do
+            if [ -x "$cand" ]; then APKSIGNER_CMD="\"$cand\""; echo "使用 apksigner 脚本: $cand"; break; fi
+          done
+          if [ -z "$APKSIGNER_CMD" ]; then
+            jar=$(find "$bt" -name 'apksigner.jar' 2>/dev/null | head -1)
+            if [ -n "$jar" ]; then
+              APKSIGNER_CMD="java -jar \"$jar\""
+              echo "回退 java -jar: $jar"
+            else
+              echo "::error::未找到 apksigner（sdk=$sdk, bt=$bt）——这一步不能跳过，否则 debug 签名的包会直接发出去"
+              ls -l "$bt" | head -20
+              exit 1
+            fi
           fi
-          chmod +x "$signer" 2>/dev/null || true
-          echo "使用 apksigner: $signer"
-          info=$("$signer" verify --print-certs "$apk" 2>&1)
+          info=$(eval "$APKSIGNER_CMD verify --print-certs '$apk'" 2>&1)
           echo "$info"
           if echo "$info" | grep -qi "Android Debug"; then
             echo "::error::APK 仍是 debug 签名，用户无法覆盖安装更新版本"
