@@ -95,40 +95,26 @@ jobs:
             echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
           } >> "$GITHUB_ENV"
 
-      - name: Trim assets for TV
-        # Gradle 的 resources.excludes 无法按 flavor 条件化，字体体积又太大
-        # （4 个字重约 32 MB），所以在构建前直接从 assets 目录删掉。
+      - name: Trim fonts for TV
+        # TV 版只保留 MiSans-Regular：远看分辨不出字重，省约 26 MB。
         #
-        # 只留 MiSans-Regular：TV 远看分辨不出字重差异，600/800 会回落到 Regular。
-        # 注意 pubspec.yaml 里仍声明了 4 个字重，删文件后 Flutter 构建会警告
-        # 「字体资源缺失」——用 sed 同步把 pubspec 的字体列表裁到只剩 Regular。
-        run: |
-          cd assets/fonts
-          for f in MiSans-Bold.ttf MiSans-Medium.ttf MiSans-Demibold.ttf MiSans-Heavy.ttf; do
-            [ -f "$f" ] && rm -f "$f" && echo "removed $f"
-          done
-          cd ../..
-          # 把 pubspec 的 fonts 段裁剪到只留 400
-          python3 - <<'PY'
-          import re
-          src = open('pubspec.yaml', encoding='utf-8').read()
-          # 找到 fonts: 段里 MiSans 家族的块，只保留 weight 400 那两行
-          pat = re.compile(
-              r'(      - family: MiSans\n      fonts:\n)((?:        - asset: assets/fonts/MiSans-[^\n]+\n          weight: \d+\n)+)'
-          )
-          def repl(m):
-              return m.group(1) + '        - asset: assets/fonts/MiSans-Regular.ttf\n          weight: 400\n'
-          out, n = pat.subn(repl, src)
-          open('pubspec.yaml', 'w', encoding='utf-8').write(out)
-          print('pubspec fonts trimmed:', n)
-          PY
-          du -sh assets/fonts
+        # 这一步必须**同时**改 pubspec 声明与删文件，原因见脚本头部注释：
+        #   · 只删文件 → "unable to locate asset entry in pubspec.yaml"
+        #   · 只改 pubspec → assets/fonts/ 整个目录仍被打包，省不到体积
+        #
+        # 具体逻辑放在 tool/trim_fonts_for_tv.py（可在本地直接跑、也能单测），
+        # 避免 workflow 里内联 heredoc 与 YAML 缩进互相干扰（已踩过一次）。
+        run: python3 tool/trim_fonts_for_tv.py
 
       - name: Build TV release APK
         # MISA_TV=true 让 Dart 侧走 TV 分支：
         #   · AppShell 强制 ImmersiveShell（不编译常规页面路径）
         #   · 播放器不显示一起看 / DLNA 入口
         run: |
+          # 上一步改过 pubspec（字体声明），先刷新依赖再构建。
+          # flutter build 默认也会跑 pub get，这里显式写一次让意图更明确，
+          # 也避免某些 Flutter 版本缓存了旧的 asset 清单。
+          flutter pub get
           flutter build apk --release \
             --flavor tv \
             --target-platform android-arm64 \
