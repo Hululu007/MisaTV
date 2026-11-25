@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../app.dart';
+import '../../core/app_variant.dart';
 import '../parse_play.dart';
 import 'player/chrome_auto_hide.dart';
 import '../../core/logging/app_log.dart';
@@ -3387,13 +3388,15 @@ class _PlayerPageState extends State<PlayerPage>
                             color: Colors.white,
                           ),
                   ),
-                if (!mini && _isDesktop)
+                // DLNA 投屏：TV 版移除（电视自己就是被投屏目标，且已有「流转」）。
+                if (!mini && _isDesktop && !kMisaTv)
                   IconButton(
                     tooltip: '投屏到电视（DLNA）',
                     onPressed: _castToDevice,
                     icon: const Icon(Icons.cast_rounded, color: Colors.white),
                   ),
-                if (!mini && _isDesktop)
+                // 一起看：TV 版移除（单台电视没有「一起看」的使用场景）。
+                if (!mini && _isDesktop && !kMisaTv)
                   IconButton(
                     tooltip: _app.watchParty.active ? '一起看（进行中）' : '一起看（局域网同看）',
                     onPressed: _showWatchParty,

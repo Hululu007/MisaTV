@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../app.dart';
+import '../../core/app_variant.dart';
 import '../../core/platform/window_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/runtime_extension.dart';
@@ -220,7 +221,11 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
 
     final theme = Theme.of(context);
     // 沉浸观影模式：整套导航与页面换成大屏 TV 布局。
-    if (app.playerSettings.immersiveMode) {
+    //
+    // TV 精简版**始终**走这条路：那个包不带常规页面，只发沉浸界面。
+    // 用户设置里的 immersiveMode 在 TV 版不再生效（也不改它，切回全功能版
+    // 时设置仍是原样）。
+    if (kMisaTv || app.playerSettings.immersiveMode) {
       return const ImmersiveShell();
     }
     // 外观设置里的底部横条尺寸：0 紧凑 / 1 标准 / 2 较大 / 3 超大。

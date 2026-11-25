@@ -9,7 +9,9 @@ import '../../core/theme/app_theme.dart';
 import '../../models/vod.dart';
 import '../../services/discover/cover_images.dart';
 import '../../services/fonts/hero_fonts.dart';
+import '../../core/app_variant.dart';
 import '../pages/detail_page.dart';
+import '../tv_detail_page.dart';
 import '../widgets/mouse_drag_scroll.dart';
 import 'designed_title.dart';
 import 'hero_title_style.dart';
@@ -1387,10 +1389,13 @@ void openImmersiveItem(
     app.requestSearch(item.name);
     return;
   }
+  // TV 精简版不编译常规 DetailPage（两千多行 + 剧照/演职员/影评等请求），
+  // 换成只保留「海报 + 简介 + 选集 + 播放」的版本。
   Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) =>
-          DetailPage(item: item, autoPlay: autoPlay, fromStart: fromStart),
+      builder: (_) => kMisaTv
+          ? TvDetailPage(item: item, autoPlay: autoPlay, fromStart: fromStart)
+          : DetailPage(item: item, autoPlay: autoPlay, fromStart: fromStart),
     ),
   );
 }

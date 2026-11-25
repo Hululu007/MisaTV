@@ -104,6 +104,27 @@ android {
         }
     }
 
+    // 两个构建变体：
+    //   full —— 现有全功能版（沉浸 + 常规 UI + 一起看 + DLNA + 外部播放器）
+    //   tv   —— TV 精简版（只有沉浸界面；砍掉一起看 / DLNA / 外部播放器 / JVM 资源）
+    //
+    // Dart 侧通过 --dart-define=MISA_TV=true 配合，让不用的页面被 tree-shake；
+    // 这里只负责「资源与清单层面」的裁剪（字体、assets）。
+    flavorDimensions += "edition"
+    productFlavors {
+        create("full") {
+            dimension = "edition"
+            applicationId = "com.kniephos.kniephos"
+            resValue("string", "app_name", "MisaTV")
+        }
+        create("tv") {
+            dimension = "edition"
+            // 独立包名：可与全功能版并存安装，互不覆盖。
+            applicationId = "com.kniephos.kniephos.tv"
+            resValue("string", "app_name", "MisaTV TV")
+        }
+    }
+
     packaging {
         jniLibs {
             // 双保险：Flutter 的 configureAbis 会在插件 apply 时把所有默认 ABI 加回来，
@@ -121,6 +142,19 @@ android {
             if (!pythonAbis.contains("x86")) {
                 excludes += "lib/x86/**"
             }
+        }
+        resources {
+            // 安卓端**永远**不需要这些，打进去只是白占体积：
+            //   · assets/jvm/**     桌面端 JRE 用的 shim jar。安卓走 ART / DexClassLoader，
+            //                       JvmRuntime.jarSpiderReady() 对 Android 直接返回 true，
+            //                       这两个目录在安卓上没有任何读取者。
+            //   · assets/aria2/**   Windows 的 aria2c.exe，安卓用内置 BT 实现。
+            //
+            // 注：Gradle 的 resources.excludes 是全局的，无法按 flavor 条件化，
+            // 所以这里只排除「安卓上确定无用」的内容；TV 版的字体裁剪交给
+            // CI 打包脚本处理（见 .github/workflows/build-android.yml）。
+            excludes += "assets/jvm/**"
+            excludes += "assets/aria2/**"
         }
     }
 

@@ -352,6 +352,63 @@ Flutter 3.47 在 Windows 默认走 Impeller OpenGLESSDF 后端，本项目的圆
 详情背景 960、收藏与直播台标 200 / 128。首页背景只用一层对角渐变，用 `CustomPainter`
 （`AppBackdropPainter`）画在内容之下的同一绘制层，不用溢出视口的 `Stack`。
 
+## TV 精简版（MISA_TV）
+
+同一套 Flutter 工程出两个安卓包：
+
+| 变体 | 命令 | applicationId | 界面 |
+| --- | --- | --- | --- |
+| 全功能 | `flutter build apk --release --target-platform android-arm64` | `com.kniephos.kniephos` | 沉浸 + 常规 |
+| TV 精简 | 同上追加 `--dart-define=MISA_TV=true` | `com.kniephos.kniephos.tv` | **只有沉浸** |
+
+两个包**独立 applicationId**，可并存安装；签名用同一个 keystore（以后要合并
+包名也不会出现签名冲突）。
+
+### 用 `--dart-define` 而不是 productFlavors 的原因
+
+Dart 侧能直接 `if (kMisaTv)` 把整块 UI 摇掉（tree-shaking 生效）。只改 Gradle
+flavor 的话，不用的页面仍会被 AOT 编译进去，省不到体积，还要维护两套 main。
+
+开关常量在 `lib/core/app_variant.dart`：
+
+```dart
+const bool kMisaTv = bool.fromEnvironment('MISA_TV');
+```
+
+### TV 版砍掉了什么
+
+| 内容 | 做法 | 理由 |
+| --- | --- | --- |
+| 常规 UI 页面（`lib/ui/pages/`） | `AppShell` 强制走 `ImmersiveShell` | 电视只用遥控器，鼠标界面没意义 |
+| 常规详情页 | 换 `lib/ui/tv_detail_page.dart`（海报 + 简介 + 选集 + 播放） | `DetailPage` 两千多行，含剧照墙 / 演职员 / 影评，都要额外请求 |
+| 一起看 | 播放器入口加 `!kMisaTv` | 单台电视没有这个场景 |
+| DLNA 投屏 | 同上 | 电视自己就是被投屏目标，且已有「流转」 |
+| 外部播放器管理 | 同上（TV 上没有 PotPlayer / MPV 可调起） | — |
+| `assets/jvm/**` | Gradle `resources.excludes`（**安卓全平台都不需要**） | 安卓走 ART / DexClassLoader，`JvmRuntime.jarSpiderReady()` 对 Android 直接返回 true |
+| `assets/aria2/**` | 同上 | Windows 的 aria2c.exe，安卓用内置 BT 实现 |
+| 多余字体 | CI 构建前删除 4 个字重 | TV 远看分辨不出字重，省约 32 MB |
+
+### TV 版**保留**的功能
+
+沉浸观影界面、Python 蜘蛛（Chaquopy，minSdk 仍是 24）、JS 蜘蛛（QuickJS）、
+jar / DEX 蜘蛛（安卓原生 DexClassLoader，**不需要 JRE**）、直播、网盘、
+WebDAV、弹幕、设备流转。
+
+### 构建
+
+```bash
+# 本地
+flutter build apk --release --target-platform android-arm64 --dart-define=MISA_TV=true
+
+# CI
+.github/workflows/build-android-tv.yml（手动触发或发布 release 时自动出包）
+```
+
+CI 里依次做：裁字体 → 构建 → 校验签名（必须是正式 keystore）→ **断言 APK 里
+没有 `assets/jvm` / `assets/aria2`**（裁剪生效）→ 打印体积 → 上传。
+
+签名 secret 与全功能版共用同一套（`ANDROID_KEYSTORE_BASE64` 等 4 个）。
+
 ## Android APK 体积
 
 1.2.0 的 arm64 发布包约 97 MB，主要构成（压缩后）：
