@@ -130,13 +130,14 @@ jobs:
         #   · 播放器不显示一起看 / DLNA 入口
         run: |
           flutter build apk --release \
+            --flavor tv \
             --target-platform android-arm64 \
             --dart-define=MISA_TV=true
 
       - name: Verify APK is signed with the release keystore
         shell: bash
         run: |
-          apk=build/app/outputs/flutter-apk/app-release.apk
+          apk=build/app/outputs/flutter-apk/app-tv-release.apk
           [ -f "$apk" ] || { echo "::error::找不到 APK"; exit 1; }
           sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
           if [ -z "$sdk" ] || [ ! -d "$sdk/build-tools" ]; then
@@ -162,7 +163,7 @@ jobs:
 
       - name: Report APK size
         run: |
-          apk=build/app/outputs/flutter-apk/app-release.apk
+          apk=build/app/outputs/flutter-apk/app-tv-release.apk
           size=$(stat -c%s "$apk")
           echo "APK 大小: $((size/1024/1024)) MB"
           echo "### TV APK 体积：$((size/1024/1024)) MB" >> "$GITHUB_STEP_SUMMARY"
@@ -170,7 +171,7 @@ jobs:
       - name: Verify no JVM/aria2 assets
         # 断言裁剪生效：安卓端不需要这些，打进去就是浪费。
         run: |
-          apk=build/app/outputs/flutter-apk/app-release.apk
+          apk=build/app/outputs/flutter-apk/app-tv-release.apk
           bad=$(unzip -l "$apk" | awk '{print $4}' | grep -E '^assets/(jvm|aria2)/' || true)
           if [ -n "$bad" ]; then
             echo "$bad"
@@ -181,7 +182,7 @@ jobs:
 
       - name: Rename APK
         run: |
-          cp build/app/outputs/flutter-apk/app-release.apk \
+          cp build/app/outputs/flutter-apk/app-tv-release.apk \
              build/app/outputs/flutter-apk/MisaTV-TV-arm64.apk
 
       - name: Upload TV APK

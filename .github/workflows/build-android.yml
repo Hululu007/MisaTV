@@ -169,14 +169,14 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Build release APK
-        run: flutter build apk --release --target-platform android-arm64
+        run: flutter build apk --release --flavor full --target-platform android-arm64
 
       - name: Verify APK is signed with the release keystore
         # 兜底断言：即使上面的步骤被人改坏，也要在发布前发现「包是 debug 签名」。
         # debug 签名的 CN 固定是 "Android Debug"，出现即视为失败。
         shell: bash
         run: |
-          apk=build/app/outputs/flutter-apk/app-release.apk
+          apk=build/app/outputs/flutter-apk/app-full-release.apk
           if [ ! -f "$apk" ]; then
             echo "::error::找不到 APK：$apk"
             exit 1
@@ -224,7 +224,7 @@ jobs:
       # 原生库一起塞进 APK（1.2.0 实测多带 25 MB）。这条断言防止回退。
       - name: Verify APK only contains arm64 native libs
         run: |
-          apk=build/app/outputs/flutter-apk/app-release.apk
+          apk=build/app/outputs/flutter-apk/app-full-release.apk
           libs=$(unzip -l "$apk" | awk '{print $4}' | grep '^lib/' || true)
           echo "$libs" | sort -u
           if echo "$libs" | grep -Eq '^lib/(x86|x86_64|armeabi-v7a)/'; then
@@ -241,7 +241,7 @@ jobs:
       # 这里在 CI 直接兜住（libpython 必须真的打进 arm64 APK）。
       - name: Verify bundled Python runtime
         run: |
-          apk=build/app/outputs/flutter-apk/app-release.apk
+          apk=build/app/outputs/flutter-apk/app-full-release.apk
           if unzip -l "$apk" | grep -qE 'lib/arm64-v8a/libpython3\.12\.so|assets/chaquopy/'; then
             echo "Python runtime bundled"
             unzip -l "$apk" | grep -E 'libpython3\.12\.so|assets/chaquopy/' | head -20
@@ -253,12 +253,12 @@ jobs:
       # 校验随包资源确实进了 APK，并生成清单方便核对。
       - name: Verify bundled shell-real assets
         run: |
-          apk=build/app/outputs/flutter-apk/app-release.apk
+          apk=build/app/outputs/flutter-apk/app-full-release.apk
           ls -lh "$apk"
           unzip -l "$apk" | grep 'assets/flutter_assets/assets/jvm/shell-real/' > /tmp/shell_entries.txt || true
           jar_count=$(grep -c '\.jar$' /tmp/shell_entries.txt || true)
           {
-            echo "APK: app-release.apk"
+            echo "APK: app-full-release.apk"
             echo "shell-real jars staged: $SHELL_JAR_COUNT"
             echo "shell-real jars bundled in APK: $jar_count"
             cat /tmp/shell_entries.txt
@@ -270,7 +270,7 @@ jobs:
       # 蜘蛛时抛 ClassNotFoundException —— 这里在 CI 里直接兜住。
       - name: Verify CatVod host classes survived R8
         run: |
-          apk="$GITHUB_WORKSPACE/build/app/outputs/flutter-apk/app-release.apk"
+          apk="$GITHUB_WORKSPACE/build/app/outputs/flutter-apk/app-full-release.apk"
           work=$(mktemp -d)
           unzip -o -q "$apk" 'classes*.dex' -d "$work"
           # 宿主 API 类 + 加固壳运行时链接的 Java 库：APK 自身代码完全不引用它们，
@@ -310,7 +310,7 @@ jobs:
         with:
           name: misatv-android
           path: |
-            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-full-release.apk
             build-manifest.txt
           if-no-files-found: error
           retention-days: 30
@@ -321,7 +321,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp build/app/outputs/flutter-apk/app-release.apk MisaTV-android-arm64.apk
+          cp build/app/outputs/flutter-apk/app-full-release.apk MisaTV-android-arm64.apk
           ls -lh MisaTV-android-arm64.apk
           gh release upload "${{ github.event.release.tag_name }}" \
             MisaTV-android-arm64.apk --clobber

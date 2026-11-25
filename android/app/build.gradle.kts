@@ -115,13 +115,11 @@ android {
         create("full") {
             dimension = "edition"
             applicationId = "com.kniephos.kniephos"
-            resValue("string", "app_name", "MisaTV")
         }
         create("tv") {
             dimension = "edition"
             // 独立包名：可与全功能版并存安装，互不覆盖。
             applicationId = "com.kniephos.kniephos.tv"
-            resValue("string", "app_name", "MisaTV TV")
         }
     }
 
