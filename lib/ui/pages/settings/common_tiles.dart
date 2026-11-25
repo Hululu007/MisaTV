@@ -40,7 +40,7 @@ class _DriveAccountRow extends StatelessWidget {
     'bili' => Icons.smart_display_outlined,
     'thunder' => Icons.bolt_rounded,
     'guangya' => Icons.cloud_sync_outlined,
-      _ => Icons.cloud_outlined,
+    _ => Icons.cloud_outlined,
   };
 
   bool get _webLogin => driveSupportsWebLogin(provider);
@@ -199,7 +199,9 @@ class _DriveAccountRow extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.45,
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -366,4 +368,3 @@ class _AccentDot extends StatelessWidget {
     );
   }
 }
-

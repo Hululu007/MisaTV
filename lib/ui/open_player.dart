@@ -42,9 +42,10 @@ Future<void> openVodPlayer(
     // 窗口创建失败时退回原来的内嵌播放器，不能让点击没有反应。
   }
   if (!context.mounted) return;
-  await Navigator.of(context, rootNavigator: rootNavigator).push(
-    MaterialPageRoute(builder: (_) => PlayerPage(session: session)),
-  );
+  await Navigator.of(
+    context,
+    rootNavigator: rootNavigator,
+  ).push(MaterialPageRoute(builder: (_) => PlayerPage(session: session)));
 }
 
 Future<void> openLivePlayer(

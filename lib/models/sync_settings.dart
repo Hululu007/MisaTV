@@ -78,6 +78,9 @@ String newSyncPairingToken() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   final random = Random.secure();
   return String.fromCharCodes(
-    List.generate(8, (_) => alphabet.codeUnitAt(random.nextInt(alphabet.length))),
+    List.generate(
+      8,
+      (_) => alphabet.codeUnitAt(random.nextInt(alphabet.length)),
+    ),
   );
 }

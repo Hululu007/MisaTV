@@ -162,13 +162,15 @@ class JarSpiderHost {
         host._errors.add(out);
       }
     }, onError: (Object _) {});
-    unawaited(process.exitCode.then((_) {
-      host._exited = true;
-      for (final out in host._stderrFilter.flush()) {
-        if (host._errors.length > 60) host._errors.removeAt(0);
-        host._errors.add(out);
-      }
-    }, onError: (Object _) {}));
+    unawaited(
+      process.exitCode.then((_) {
+        host._exited = true;
+        for (final out in host._stderrFilter.flush()) {
+          if (host._errors.length > 60) host._errors.removeAt(0);
+          host._errors.add(out);
+        }
+      }, onError: (Object _) {}),
+    );
     // 监听器挂好后再收养：MethodChannel 调用期间 JVM 可能已经在写启动日志。
     await ProcessJob.adopt(process.pid);
     return host;
@@ -320,14 +322,16 @@ class JarServeHost {
         host._errors.add(out);
       }
     }, onError: (Object _) {});
-    unawaited(process.exitCode.then((_) {
-      host._exited = true;
-      for (final out in host._stderrFilter.flush()) {
-        if (host._errors.length > 60) host._errors.removeAt(0);
-        host._errors.add(out);
-      }
-      host._failAll('常驻蜘蛛进程已退出');
-    }, onError: (Object _) {}));
+    unawaited(
+      process.exitCode.then((_) {
+        host._exited = true;
+        for (final out in host._stderrFilter.flush()) {
+          if (host._errors.length > 60) host._errors.removeAt(0);
+          host._errors.add(out);
+        }
+        host._failAll('常驻蜘蛛进程已退出');
+      }, onError: (Object _) {}),
+    );
     // 监听器挂好后再收养：MethodChannel 调用期间 JVM 可能已经在写启动日志。
     await ProcessJob.adopt(process.pid);
     return host;
@@ -346,12 +350,14 @@ class JarServeHost {
     inflight++;
     try {
       try {
-        _stdin.writeln(jsonEncode({
-          'id': id,
-          'className': className,
-          'method': method,
-          'args': args,
-        }));
+        _stdin.writeln(
+          jsonEncode({
+            'id': id,
+            'className': className,
+            'method': method,
+            'args': args,
+          }),
+        );
         await _stdin.flush();
       } catch (_) {
         // 进程已退出时管道会先断开、exitCode 还没回调：统一按 host 死亡处理，
@@ -407,15 +413,19 @@ class JarServeHost {
     if (completer == null || completer.isCompleted) return;
     final pp = decoded['pp'];
     if (pp is num && pp.toInt() > 0) proxyPort = pp.toInt();
-    completer.complete(ServeReply(
-      ok: decoded['ok'] == true,
-      data: (decoded['data'] ?? '').toString(),
-    ));
+    completer.complete(
+      ServeReply(
+        ok: decoded['ok'] == true,
+        data: (decoded['data'] ?? '').toString(),
+      ),
+    );
   }
 
   void _failAll(String message) {
     for (final completer in _pending.values) {
-      if (!completer.isCompleted) completer.completeError(ServeHostException(message));
+      if (!completer.isCompleted) {
+        completer.completeError(ServeHostException(message));
+      }
     }
     _pending.clear();
   }

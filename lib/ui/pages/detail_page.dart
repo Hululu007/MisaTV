@@ -129,11 +129,7 @@ class _DetailPageState extends State<DetailPage> {
     return name.isNotEmpty ? name : itemName;
   }
 
-  Future<void> _loadBackdrop(
-    String name,
-    String year,
-    String altTitle,
-  ) async {
+  Future<void> _loadBackdrop(String name, String year, String altTitle) async {
     final title = name.trim();
     if (title.isEmpty) return;
     final key = '$title|$year|$altTitle';
@@ -239,9 +235,7 @@ class _DetailPageState extends State<DetailPage> {
       setState(() => _douban = info);
       unawaited(_loadEpisodeStills(detail));
     }
-    unawaited(
-      _loadBackdrop(name, detail.year, info?.originalTitle ?? ''),
-    );
+    unawaited(_loadBackdrop(name, detail.year, info?.originalTitle ?? ''));
     final extra = await app.discoverService.loadDetailExtra(
       name,
       year: detail.year,
@@ -1441,196 +1435,201 @@ class _DetailPageState extends State<DetailPage> {
                             SizedBox(
                               width: m.compact
                                   ? MediaQuery.sizeOf(context).width -
-                                      m.gutter * 2
+                                        m.gutter * 2
                                   : MediaQuery.sizeOf(context).width * 0.52,
                               child: LayoutBuilder(
-                                builder: (context, constraints) =>
-                                    SingleChildScrollView(
-                                      child: ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          minHeight: constraints.maxHeight,
-                                        ),
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                    TitleTint(
-                                      title: name,
-                                      year: year,
-                                      altTitle: douban?.originalTitle ?? '',
-                                      fallbackUrl: poster,
-                                      builder: (context, tint) => DesignedTitle(
-                                        plan: buildHeroTitlePlan(
-                                          title: name,
-                                          originalTitle:
-                                              douban?.originalTitle ?? '',
-                                          genres: genres,
-                                          countries: countries,
-                                          allowVertical: false,
-                                          tint: tint,
-                                        ),
-                                        scale: 0.9,
-                                        maxWidth:
-                                            MediaQuery.sizeOf(context).width *
-                                            0.5,
-                                      ),
+                                builder: (context, constraints) => SingleChildScrollView(
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      minHeight: constraints.maxHeight,
                                     ),
-                                    const SizedBox(height: 16),
-                                    Wrap(
-                                      spacing: 10,
-                                      runSpacing: 8,
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       crossAxisAlignment:
-                                          WrapCrossAlignment.center,
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        if (rating != null)
-                                          _ImmersiveMetaChip(
-                                            '豆瓣 ${rating.toStringAsFixed(1)}',
-                                            highlight: true,
+                                        TitleTint(
+                                          title: name,
+                                          year: year,
+                                          altTitle: douban?.originalTitle ?? '',
+                                          fallbackUrl: poster,
+                                          builder: (context, tint) =>
+                                              DesignedTitle(
+                                                plan: buildHeroTitlePlan(
+                                                  title: name,
+                                                  originalTitle:
+                                                      douban?.originalTitle ??
+                                                      '',
+                                                  genres: genres,
+                                                  countries: countries,
+                                                  allowVertical: false,
+                                                  tint: tint,
+                                                ),
+                                                scale: 0.9,
+                                                maxWidth:
+                                                    MediaQuery.sizeOf(context)
+                                                        .width *
+                                                    0.5,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Wrap(
+                                          spacing: 10,
+                                          runSpacing: 8,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
+                                          children: [
+                                            if (rating != null)
+                                              _ImmersiveMetaChip(
+                                                '豆瓣 ${rating.toStringAsFixed(1)}',
+                                                highlight: true,
+                                              ),
+                                            if (year.isNotEmpty)
+                                              _ImmersiveMetaChip(year),
+                                            if (episodes.isNotEmpty)
+                                              _ImmersiveMetaChip(
+                                                '${episodes.length} 集',
+                                              )
+                                            else if (folders.isNotEmpty)
+                                              _ImmersiveMetaChip(
+                                                '${folders.length} 个目录',
+                                              ),
+                                            for (final genre in genres)
+                                              _ImmersiveMetaChip(genre),
+                                          ],
+                                        ),
+                                        if (intro.isNotEmpty) ...[
+                                          const SizedBox(height: 20),
+                                          Text(
+                                            intro,
+                                            maxLines: _immersiveIntroOpen
+                                                ? null
+                                                : 3,
+                                            overflow: _immersiveIntroOpen
+                                                ? TextOverflow.visible
+                                                : TextOverflow.ellipsis,
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.78),
+                                                  height: 1.75,
+                                                ),
                                           ),
-                                        if (year.isNotEmpty)
-                                          _ImmersiveMetaChip(year),
-                                        if (episodes.isNotEmpty)
-                                          _ImmersiveMetaChip(
-                                            '${episodes.length} 集',
-                                          )
-                                        else if (folders.isNotEmpty)
-                                          _ImmersiveMetaChip(
-                                            '${folders.length} 个目录',
-                                          ),
-                                        for (final genre in genres)
-                                          _ImmersiveMetaChip(genre),
-                                      ],
-                                    ),
-                                    if (intro.isNotEmpty) ...[
-                                      const SizedBox(height: 20),
-                                      Text(
-                                        intro,
-                                        maxLines: _immersiveIntroOpen
-                                            ? null
-                                            : 3,
-                                        overflow: _immersiveIntroOpen
-                                            ? TextOverflow.visible
-                                            : TextOverflow.ellipsis,
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                              color: Colors.white.withValues(
-                                                alpha: 0.78,
-                                              ),
-                                              height: 1.75,
+                                          const SizedBox(height: 4),
+                                          TextButton(
+                                            onPressed: () => setState(
+                                              () => _immersiveIntroOpen =
+                                                  !_immersiveIntroOpen,
                                             ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      TextButton(
-                                        onPressed: () => setState(
-                                          () => _immersiveIntroOpen =
-                                              !_immersiveIntroOpen,
-                                        ),
-                                        style: TextButton.styleFrom(
-                                          padding: EdgeInsets.zero,
-                                          minimumSize: const Size(0, 30),
-                                        ),
-                                        child: Text(
-                                          _immersiveIntroOpen ? '收起简介' : '展开简介',
-                                          style: theme.textTheme.labelSmall
-                                              ?.copyWith(
-                                                color: theme.colorScheme.primary
-                                                    .withValues(alpha: 0.86),
-                                              ),
-                                        ),
-                                      ),
-                                    ],
-                                    if (canContinue) ...[
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        '上次看到 ${history.episodeName.isEmpty ? '第${history.episodeIndex + 1}集' : history.episodeName}'
-                                        ' · ${_durationLabel(history.positionMs)}',
-                                        style: theme.textTheme.labelSmall
-                                            ?.copyWith(
-                                              color: Colors.white.withValues(
-                                                alpha: 0.52,
-                                              ),
+                                            style: TextButton.styleFrom(
+                                              padding: EdgeInsets.zero,
+                                              minimumSize: const Size(0, 30),
                                             ),
-                                      ),
-                                    ],
-                                    const SizedBox(height: 22),
-                                    if (episodes.isNotEmpty)
-                                      Row(
-                                        children: [
-                                          FilledButton.icon(
-                                            autofocus: true,
-                                            onPressed: canContinue
-                                                ? playContinue
-                                                : playFromStart,
-                                            icon: const Icon(
-                                              Icons.play_arrow_rounded,
-                                              size: 22,
-                                            ),
-                                            label: Text(
-                                              canContinue ? '继续播放' : '立即播放',
-                                            ),
-                                            style: FilledButton.styleFrom(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 26,
-                                                    vertical: 17,
+                                            child: Text(
+                                              _immersiveIntroOpen
+                                                  ? '收起简介'
+                                                  : '展开简介',
+                                              style: theme.textTheme.labelSmall
+                                                  ?.copyWith(
+                                                    color: theme
+                                                        .colorScheme
+                                                        .primary
+                                                        .withValues(
+                                                          alpha: 0.86,
+                                                        ),
                                                   ),
                                             ),
                                           ),
-                                          if (canContinue) ...[
-                                            const SizedBox(width: 12),
-                                            OutlinedButton.icon(
-                                              onPressed: playFromStart,
-                                              icon: const Icon(
-                                                Icons.replay_rounded,
-                                                size: 20,
-                                              ),
-                                              label: const Text('从头播放'),
-                                              style: OutlinedButton.styleFrom(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 22,
-                                                      vertical: 17,
-                                                    ),
-                                              ),
-                                            ),
-                                          ],
                                         ],
-                                      ),
-                                    if (cast.isNotEmpty) ...[
-                                      const SizedBox(height: 22),
-                                      Text(
-                                        '演职员',
-                                        style: theme.textTheme.labelMedium
-                                            ?.copyWith(
-                                              color: Colors.white.withValues(
-                                                alpha: 0.5,
-                                              ),
-                                              fontWeight: FontWeight.w700,
-                                              letterSpacing: 1,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Wrap(
-                                        spacing: 8,
-                                        runSpacing: 6,
-                                        children: [
-                                          for (final member in cast.take(6))
-                                            _ImmersiveMetaChip(
-                                              member.role.isEmpty
-                                                  ? member.name
-                                                  : '${member.name} · ${member.role}',
-                                            ),
+                                        if (canContinue) ...[
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            '上次看到 ${history.episodeName.isEmpty ? '第${history.episodeIndex + 1}集' : history.episodeName}'
+                                            ' · ${_durationLabel(history.positionMs)}',
+                                            style: theme.textTheme.labelSmall
+                                                ?.copyWith(
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.52),
+                                                ),
+                                          ),
                                         ],
-                                      ),
-                                    ],
-                                          ],
-                                        ),
-                                      ),
+                                        const SizedBox(height: 22),
+                                        if (episodes.isNotEmpty)
+                                          Row(
+                                            children: [
+                                              FilledButton.icon(
+                                                autofocus: true,
+                                                onPressed: canContinue
+                                                    ? playContinue
+                                                    : playFromStart,
+                                                icon: const Icon(
+                                                  Icons.play_arrow_rounded,
+                                                  size: 22,
+                                                ),
+                                                label: Text(
+                                                  canContinue ? '继续播放' : '立即播放',
+                                                ),
+                                                style: FilledButton.styleFrom(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 26,
+                                                        vertical: 17,
+                                                      ),
+                                                ),
+                                              ),
+                                              if (canContinue) ...[
+                                                const SizedBox(width: 12),
+                                                OutlinedButton.icon(
+                                                  onPressed: playFromStart,
+                                                  icon: const Icon(
+                                                    Icons.replay_rounded,
+                                                    size: 20,
+                                                  ),
+                                                  label: const Text('从头播放'),
+                                                  style: OutlinedButton.styleFrom(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 22,
+                                                          vertical: 17,
+                                                        ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        if (cast.isNotEmpty) ...[
+                                          const SizedBox(height: 22),
+                                          Text(
+                                            '演职员',
+                                            style: theme.textTheme.labelMedium
+                                                ?.copyWith(
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.5),
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: 1,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 6,
+                                            children: [
+                                              for (final member in cast.take(6))
+                                                _ImmersiveMetaChip(
+                                                  member.role.isEmpty
+                                                      ? member.name
+                                                      : '${member.name} · ${member.role}',
+                                                ),
+                                            ],
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                   ),
                                 ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1676,7 +1675,9 @@ class _DetailPageState extends State<DetailPage> {
                                               ? '${folders.length} 个目录'
                                               : '0 集'),
                                     style: theme.textTheme.labelSmall?.copyWith(
-                                      color: Colors.white.withValues(alpha: 0.46),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.46,
+                                      ),
                                     ),
                                   ),
                                   const Spacer(),
@@ -1769,9 +1770,8 @@ class _DetailPageState extends State<DetailPage> {
                                             '该线路没有可播放的剧集',
                                             style: theme.textTheme.bodySmall
                                                 ?.copyWith(
-                                                  color: Colors.white.withValues(
-                                                    alpha: 0.52,
-                                                  ),
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.52),
                                                 ),
                                           ),
                                         )
@@ -1795,7 +1795,8 @@ class _DetailPageState extends State<DetailPage> {
                                               fallback: poster,
                                               still:
                                                   _episodeStills.length > index
-                                                  ? (_episodeStills[index] ?? '')
+                                                  ? (_episodeStills[index] ??
+                                                        '')
                                                   : '',
                                               selected: selected,
                                               onTap: () => _playEpisode(index),
@@ -1837,8 +1838,7 @@ class _DetailPageState extends State<DetailPage> {
                                 SizedBox(
                                   height: 148,
                                   child: ScrollConfiguration(
-                                    behavior:
-                                        const MouseDragScrollBehavior(),
+                                    behavior: const MouseDragScrollBehavior(),
                                     child: ListView.separated(
                                       scrollDirection: Axis.horizontal,
                                       itemCount: recs.length,
@@ -2247,8 +2247,7 @@ class _DetailPageState extends State<DetailPage> {
                                           const SizedBox(height: 14),
                                           _EpisodeGrid(
                                             episodes: episodes,
-                                            currentIndex:
-                                                history?.flag == _flag
+                                            currentIndex: history?.flag == _flag
                                                 ? history?.episodeIndex
                                                 : null,
                                             onTap: (index) =>
@@ -2278,10 +2277,9 @@ class _DetailPageState extends State<DetailPage> {
                                                 ),
                                               ),
                                               TextButton.icon(
-                                                onPressed: () =>
-                                                    _search(
-                                                      _displayNameOf(detail),
-                                                    ),
+                                                onPressed: () => _search(
+                                                  _displayNameOf(detail),
+                                                ),
                                                 icon: const Icon(
                                                   Icons.search_rounded,
                                                   size: 18,
@@ -2630,9 +2628,7 @@ class _DetailHeader extends StatelessWidget {
       HoverMarqueeText(
         title,
         maxLines: 2,
-        textAlign: narrow && !mobileLayout
-            ? TextAlign.center
-            : TextAlign.left,
+        textAlign: narrow && !mobileLayout ? TextAlign.center : TextAlign.left,
         style: theme.textTheme.headlineMedium?.copyWith(
           fontSize: mobileLayout ? 22 : (narrow ? 26 : 34),
         ),

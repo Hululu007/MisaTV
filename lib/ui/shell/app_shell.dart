@@ -266,8 +266,8 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
     );
 
     // clamp 防止个别 ROM 返回异常大的 bottom 值把横条抬得过高。
-    final gestureInset =
-        MediaQuery.of(context).viewPadding.bottom.clamp(0.0, 48.0);
+    final gestureInset = MediaQuery.of(context).viewPadding.bottom
+        .clamp(0.0, 48.0);
     final navBar = Padding(
       padding: EdgeInsets.fromLTRB(12, 4, 12, 10 + gestureInset),
       child: Center(

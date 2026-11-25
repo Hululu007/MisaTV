@@ -290,7 +290,9 @@ class _SyncPageState extends State<SyncPage> {
                 DropdownButtonFormField<String>(
                   // FormField 只在创建时读取 initialValue；自动选中/切换服务器
                   // 时用 key 重建，保证下拉框显示的就是真正会同步的那台。
-                  key: ValueKey('dav-${selectedServer ?? '-'}-${servers.length}'),
+                  key: ValueKey(
+                    'dav-${selectedServer ?? '-'}-${servers.length}',
+                  ),
                   initialValue: selectedServer,
                   decoration: const InputDecoration(labelText: '服务器'),
                   items: [

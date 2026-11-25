@@ -1467,7 +1467,9 @@ class SettingsPageState extends State<SettingsPage> {
                       collapsible: true,
                       initiallyExpanded: false,
                       trailing: Text(
-                        app.playerSettings.useFfmpeg ? 'FFmpeg/libmdk' : '系统 ExoPlayer',
+                        app.playerSettings.useFfmpeg
+                            ? 'FFmpeg/libmdk'
+                            : '系统 ExoPlayer',
                         style: theme.textTheme.labelSmall,
                       ),
                       summary: Text(
@@ -1475,7 +1477,9 @@ class SettingsPageState extends State<SettingsPage> {
                             ? '已启用 FFmpeg/libmdk 解码，兼容更多编码'
                             : '使用系统 ExoPlayer；如部分源放不动可开启',
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.45,
+                          ),
                         ),
                       ),
                       child: Column(
@@ -1500,7 +1504,9 @@ class SettingsPageState extends State<SettingsPage> {
                             '提示：若某源用系统播放器放不动，可开启本项；'
                             '若开启后画面异常或闪退，关掉即回落系统播放器。',
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.5,
+                              ),
                             ),
                           ),
                         ],
@@ -2167,42 +2173,42 @@ class SettingsPageState extends State<SettingsPage> {
                               : app.clearSearchHistory,
                         ),
                         const Divider(height: 24),
-                      _ActionRow(
-                                icon: Icons.folder_open_rounded,
-                                title: '运行日志',
-                                subtitle: AppLog.directory.isEmpty
-                                    ? 'Web 版不写本地日志'
-                                    : '${AppLog.directory}（点此打开目录或导出到下载/MisaTV）',
-                                onTap: AppLog.directory.isEmpty
-                                    ? null
-                                    : () async {
-                                        try {
-                                          final exported =
-                                              await AppLog.exportLatestLog();
-                                          if (exported != null) {
-                                            if (!context.mounted) return;
-                                            final msg = exported.isEmpty
-                                                ? '暂无可导出的日志文件'
-                                                : '已导出运行日志到：$exported';
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(content: Text(msg)),
-                                            );
-                                            return;
-                                          }
-                                        } catch (e) {
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                  content: Text('导出日志失败：$e')),
-                                            );
-                                          }
-                                          return;
-                                        }
-                                        await AppLog.openDirectory();
-                                      },
-                              ),
+                        _ActionRow(
+                          icon: Icons.folder_open_rounded,
+                          title: '运行日志',
+                          subtitle: AppLog.directory.isEmpty
+                              ? 'Web 版不写本地日志'
+                              : '${AppLog.directory}（点此打开目录或导出到下载/MisaTV）',
+                          onTap: AppLog.directory.isEmpty
+                              ? null
+                              : () async {
+                                  try {
+                                    final exported =
+                                        await AppLog.exportLatestLog();
+                                    if (exported != null) {
+                                      if (!context.mounted) return;
+                                      final msg = exported.isEmpty
+                                          ? '暂无可导出的日志文件'
+                                          : '已导出运行日志到：$exported';
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                            SnackBar(content: Text(msg)),
+                                          );
+                                      return;
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(content: Text('导出日志失败：$e')),
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  await AppLog.openDirectory();
+                                },
+                        ),
                       ],
                     ),
                   ),

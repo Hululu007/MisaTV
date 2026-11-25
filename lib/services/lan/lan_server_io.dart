@@ -52,9 +52,12 @@ class LanServer {
     }
     _server = server;
     _port = server.port;
-    server.listen(_handle, onError: (Object e) {
-      AppLog.w('lan', '局域网服务连接异常：$e');
-    });
+    server.listen(
+      _handle,
+      onError: (Object e) {
+        AppLog.w('lan', '局域网服务连接异常：$e');
+      },
+    );
     AppLog.i('lan', '局域网同步服务已启动：0.0.0.0:$_port');
     return _port;
   }
@@ -183,7 +186,11 @@ class LanServer {
     Map<String, dynamic> body,
   ) async {
     res.statusCode = status;
-    res.headers.contentType = ContentType('application', 'json', charset: 'utf-8');
+    res.headers.contentType = ContentType(
+      'application',
+      'json',
+      charset: 'utf-8',
+    );
     res.headers.set('Cache-Control', 'no-store');
     final bytes = utf8.encode(jsonEncode(body));
     res.contentLength = bytes.length;

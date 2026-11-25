@@ -349,11 +349,8 @@ class _ImmersiveBackdropState extends State<ImmersiveBackdrop> {
     if (key == _key) return;
     _key = key;
     // 固定 TMDB 优先：先高分辨率横图，再剧照，最后走其它来源兜底。
-    _future = AppScope.of(context).artworkService.backdrop(
-      artwork,
-      year: widget.year,
-      altTitle: altTitle,
-    );
+    _future = AppScope.of(context).artworkService
+        .backdrop(artwork, year: widget.year, altTitle: altTitle);
   }
 
   @override
@@ -653,10 +650,7 @@ class _ImmersiveCardState extends State<ImmersiveCard> {
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Color(0xB3000000),
-                                ],
+                                colors: [Colors.transparent, Color(0xB3000000)],
                                 stops: [0.55, 1],
                               ),
                             ),
@@ -1208,7 +1202,7 @@ class _ImmersiveHeroState extends State<ImmersiveHero> {
                               );
                               final heroTextMaxWidth = m.compact || m.short
                                   ? MediaQuery.sizeOf(context).width -
-                                      m.heroInset * 2
+                                        m.heroInset * 2
                                   : double.infinity;
                               // 横屏手机：竖排标题与右侧信息并排，标题不能占满整行。
                               final verticalTitleWidth = m.short
@@ -1220,7 +1214,9 @@ class _ImmersiveHeroState extends State<ImmersiveHero> {
                                 descriptionWidth: plan.vertical
                                     ? (m.short
                                           ? heroTextMaxWidth * 0.36
-                                          : (m.compact ? heroTextMaxWidth : 560))
+                                          : (m.compact
+                                                ? heroTextMaxWidth
+                                                : 560))
                                     : (m.compact || m.short
                                           ? heroTextMaxWidth
                                           : 760),

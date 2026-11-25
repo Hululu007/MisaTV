@@ -615,61 +615,61 @@ class PlayerSettings {
     final storedMin = (j['bufferMinSec'] as num?)?.toDouble();
     final storedMax = (j['bufferMaxSec'] as num?)?.toDouble();
     return PlayerSettings(
-    speed: (j['speed'] as num?)?.toDouble() ?? 1.0,
-    autoLandscape: (j['autoLandscape'] as bool?) ?? true,
-    useFfmpeg: (j['useFfmpeg'] as bool?) ?? true,
-    autoPlayNext: (j['autoPlayNext'] as bool?) ?? true,
-    autoSwitchLine: (j['autoSwitchLine'] as bool?) ?? false,
-    magnetDownloadDir: (j['magnetDownloadDir'] ?? '').toString().trim(),
-    rememberProgress: (j['rememberProgress'] as bool?) ?? true,
-    incognito: (j['incognito'] as bool?) ?? false,
-    historyLimit: ((j['historyLimit'] as num?)?.toInt() ?? 200)
-        .clamp(30, 500)
-        .toInt(),
-    overlayMetrics:
-        (j['overlayMetrics'] as List?)
-            ?.map((e) => '$e')
-            .where((e) => kPlayerOverlayMetrics.any((m) => m.id == e))
-            .toList() ??
-        kDefaultPlayerOverlayMetrics,
-    liveOverlayMetrics:
-        (j['liveOverlayMetrics'] as List?)
-            ?.map((e) => '$e')
-            .where((e) => kLivePlayerOverlayMetrics.any((m) => m.id == e))
-            .toList() ??
-        kDefaultLivePlayerOverlayMetrics,
-    overlayFontSize: (j['overlayFontSize'] as num?)?.toDouble() ?? 14,
-    overlayVisible: (j['overlayVisible'] as bool?) ?? false,
-    volume: ((j['volume'] as num?)?.toDouble() ?? 1.0)
-        .clamp(0.0, 1.0)
-        .toDouble(),
-    m3u8Purify: (j['m3u8Purify'] as bool?) ?? false,
-    bufferMinSec: ((tuned ? storedMin : null) ?? 1.0)
-        .clamp(0.2, 30.0)
-        .toDouble(),
-    bufferMaxSec: ((tuned ? storedMax : null) ?? 15.0)
-        .clamp(1.0, 120.0)
-        .toDouble(),
-    bufferTuned: tuned,
-    streamCache: (j['streamCache'] as bool?) ?? false,
-    streamCacheMb: ((j['streamCacheMb'] as num?)?.toInt() ?? 1024)
-        .clamp(128, 16384)
-        .toInt(),
-    fit: normalizePlayerFit((j['fit'] ?? '').toString()).name,
-    jsWorkerPool: (j['jsWorkerPool'] as bool?) ?? false,
-    keepSpiderHosts: (j['keepSpiderHosts'] as bool?) ?? false,
-    externalPlayers: _externalPlayersFromJson(j['externalPlayers']),
-    defaultPlayer: normalizeDefaultPlayer(
-      (j['defaultPlayer'] ?? '').toString(),
-    ),
-    immersiveMode: (j['immersiveMode'] as bool?) ?? false,
-    immersiveFontScale: ((j['immersiveFontScale'] as num?)?.toDouble() ?? 1.0)
-        .clamp(1.0, 1.5)
-        .toDouble(),
-    popOutPlayer: (j['popOutPlayer'] as bool?) ?? false,
-    tmdbApiKey: (j['tmdbApiKey'] ?? '').toString().trim(),
-    tmdbReadToken: (j['tmdbReadToken'] ?? '').toString().trim(),
-    bossKey: normalizeBossKey((j['bossKey'] ?? '').toString()),
+      speed: (j['speed'] as num?)?.toDouble() ?? 1.0,
+      autoLandscape: (j['autoLandscape'] as bool?) ?? true,
+      useFfmpeg: (j['useFfmpeg'] as bool?) ?? true,
+      autoPlayNext: (j['autoPlayNext'] as bool?) ?? true,
+      autoSwitchLine: (j['autoSwitchLine'] as bool?) ?? false,
+      magnetDownloadDir: (j['magnetDownloadDir'] ?? '').toString().trim(),
+      rememberProgress: (j['rememberProgress'] as bool?) ?? true,
+      incognito: (j['incognito'] as bool?) ?? false,
+      historyLimit: ((j['historyLimit'] as num?)?.toInt() ?? 200)
+          .clamp(30, 500)
+          .toInt(),
+      overlayMetrics:
+          (j['overlayMetrics'] as List?)
+              ?.map((e) => '$e')
+              .where((e) => kPlayerOverlayMetrics.any((m) => m.id == e))
+              .toList() ??
+          kDefaultPlayerOverlayMetrics,
+      liveOverlayMetrics:
+          (j['liveOverlayMetrics'] as List?)
+              ?.map((e) => '$e')
+              .where((e) => kLivePlayerOverlayMetrics.any((m) => m.id == e))
+              .toList() ??
+          kDefaultLivePlayerOverlayMetrics,
+      overlayFontSize: (j['overlayFontSize'] as num?)?.toDouble() ?? 14,
+      overlayVisible: (j['overlayVisible'] as bool?) ?? false,
+      volume: ((j['volume'] as num?)?.toDouble() ?? 1.0)
+          .clamp(0.0, 1.0)
+          .toDouble(),
+      m3u8Purify: (j['m3u8Purify'] as bool?) ?? false,
+      bufferMinSec: ((tuned ? storedMin : null) ?? 1.0)
+          .clamp(0.2, 30.0)
+          .toDouble(),
+      bufferMaxSec: ((tuned ? storedMax : null) ?? 15.0)
+          .clamp(1.0, 120.0)
+          .toDouble(),
+      bufferTuned: tuned,
+      streamCache: (j['streamCache'] as bool?) ?? false,
+      streamCacheMb: ((j['streamCacheMb'] as num?)?.toInt() ?? 1024)
+          .clamp(128, 16384)
+          .toInt(),
+      fit: normalizePlayerFit((j['fit'] ?? '').toString()).name,
+      jsWorkerPool: (j['jsWorkerPool'] as bool?) ?? false,
+      keepSpiderHosts: (j['keepSpiderHosts'] as bool?) ?? false,
+      externalPlayers: _externalPlayersFromJson(j['externalPlayers']),
+      defaultPlayer: normalizeDefaultPlayer(
+        (j['defaultPlayer'] ?? '').toString(),
+      ),
+      immersiveMode: (j['immersiveMode'] as bool?) ?? false,
+      immersiveFontScale: ((j['immersiveFontScale'] as num?)?.toDouble() ?? 1.0)
+          .clamp(1.0, 1.5)
+          .toDouble(),
+      popOutPlayer: (j['popOutPlayer'] as bool?) ?? false,
+      tmdbApiKey: (j['tmdbApiKey'] ?? '').toString().trim(),
+      tmdbReadToken: (j['tmdbReadToken'] ?? '').toString().trim(),
+      bossKey: normalizeBossKey((j['bossKey'] ?? '').toString()),
     );
   }
 }
