@@ -1,0 +1,25 @@
+name: probe apksigner
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: probe
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          echo "resolved sdk=$sdk"
+          ls -d "$sdk"/build-tools/* 2>/dev/null | sort -V | tail -3
+          bt=$(ls -d "$sdk"/build-tools/* 2>/dev/null | sort -V | tail -1)
+          echo "--- bt=$bt ---"
+          echo "--- ls bin | grep apksigner ---"
+          ls -l "$bt/bin/" 2>/dev/null | grep -i apksigner || echo "(none in bin)"
+          echo "--- find apksigner.jar ---"
+          find "$bt" -name 'apksigner.jar' 2>/dev/null
+          echo "--- find any apksigner ---"
+          find "$bt" -name 'apksigner*' 2>/dev/null | head -5
