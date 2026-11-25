@@ -385,5 +385,24 @@ void main() {
         '--start-time=90',
       ]);
     });
+
+    // 外部播放器「点了没反应」曾经完全查不出原因：Process.start 的 onError
+    // 被吞掉、函数还返回 true，UI 认为成功、不回退、不提示。
+    // 现在失败原因通过 onLaunchError 交回调用方，并写进日志。
+    test('文件不存在时直接返回 false，不触发回调', () {
+      var called = false;
+      final ok = launchExternalPlayer(
+        r'D:\definitely-missing\Nope.exe',
+        'https://example.com/a.m3u8',
+        onLaunchError: (_) => called = true,
+      );
+      expect(ok, isFalse);
+      // 参数层面就拒绝了，不需要异步回调。
+      expect(called, isFalse);
+    });
+
+    test('空路径返回 false', () {
+      expect(launchExternalPlayer('', 'https://example.com/a.m3u8'), isFalse);
+    });
   });
 }

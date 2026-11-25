@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 
 import '../../app.dart';
 import '../parse_play.dart';
+import '../../core/logging/app_log.dart';
+import '../../core/logging/log_redact.dart';
 import '../../core/platform/window_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/site_config.dart';
@@ -707,7 +709,18 @@ class _DetailPageState extends State<DetailPage> {
     required int startMs,
   }) async {
     final setting = app.playerSettings.defaultPlayer;
-    if (normalizeDefaultPlayer(setting) == kDefaultPlayerBuiltin) return false;
+    // 外部播放器「点了没反应」时，日志是唯一的排查依据：这里把每一步决策都
+    // 记下来（选了什么、为什么回退、地址是什么），下次直接看 `[external]` 标签。
+    final normalized = normalizeDefaultPlayer(setting);
+    AppLog.i(
+      'external',
+      '默认播放器设置=$setting 归一化=$normalized '
+          '自定义路径=${app.playerSettings.defaultCustomPlayerPathValue}',
+    );
+    if (normalized == kDefaultPlayerBuiltin) {
+      AppLog.i('external', '设置为内置播放器，跳过外部播放器');
+      return false;
+    }
 
     final resource = '${detail.sourceKey}|${detail.id}';
     final rawName = episodes[index].name.trim();
@@ -719,12 +732,20 @@ class _DetailPageState extends State<DetailPage> {
     final effectiveStart = startMs > 0 ? startMs : (skip?.intro ?? 0) * 1000;
     final seconds = effectiveStart ~/ 1000;
     final source = app.preparePlay(play, forceRelay: true);
+    AppLog.i(
+      'external',
+      '准备交给外部播放器 playable=${play.playable} '
+          'url=${redactUrl(play.url)} → 中继后=${redactUrl(source.url)} '
+          'headers=${source.headers.keys.join(',')}',
+    );
     // PotPlayer 等外部播放器打开 `/chunk` 会并发多条探针，先做一次预热，
     // 避免壳内取流服务在会话登记前后互相覆盖，最终一直加载。
     if (play.url.contains('/chunk') && play.url.contains('127.0.0.1')) {
       _toast('正在准备取流地址…');
     }
-    if (!await app.sourceService.jar.warmUpLocalPlayUrl(play.url)) {
+    final warmed = await app.sourceService.jar.warmUpLocalPlayUrl(play.url);
+    AppLog.i('external', '壳内取流预热=${warmed ? '成功/不需要' : '失败'}');
+    if (!warmed) {
       _toast('取流地址准备失败，已改用内置播放器');
       return false;
     }
@@ -744,10 +765,17 @@ class _DetailPageState extends State<DetailPage> {
             currentIndex: index,
             currentUrl: source.url,
           );
+    final playlistLabel = playlist ?? '未生成（单集或中继未就绪）';
+    AppLog.i(
+      'external',
+      '选集列表=$playlistLabel 集数=${episodes.length} 起播秒=$seconds',
+    );
     try {
       if (isMpv) {
         final exe = await MpvExtension.instance.executablePath;
+        AppLog.i('external', 'MPV 可执行文件=$exe');
         if (exe.isEmpty) {
+          AppLog.w('external', 'MPV 未安装（executablePath 为空），回退内置播放器');
           _toast('Yaozhi MPV 未安装，已改用内置播放器');
           return false;
         }
@@ -756,9 +784,14 @@ class _DetailPageState extends State<DetailPage> {
           headers: playlist == null ? source.headers : const {},
           startSeconds: playlist == null ? seconds : 0,
         );
+        AppLog.i('external', 'MPV 已拉起');
       } else {
-        if (customPath.isEmpty) return false;
+        if (customPath.isEmpty) {
+          AppLog.w('external', '自定义播放器路径为空，回退内置播放器');
+          return false;
+        }
         if (!externalPlayerExists(customPath)) {
+          AppLog.w('external', '自定义播放器文件不存在：$customPath，回退内置播放器');
           _toast('默认第三方播放器文件不存在，已改用内置播放器');
           return false;
         }
@@ -777,19 +810,31 @@ class _DetailPageState extends State<DetailPage> {
           extraArgs: playlist == null
               ? externalSeekArgs(externalPlayerKind(customPath), seconds)
               : const [],
+          // 进程起不来时（权限 / 杀软拦截 / 路径含特殊字符）以前完全静默，
+          // 现在至少能在界面上看到原因，日志里有完整堆栈。
+          onLaunchError: (e) {
+            if (mounted) _toast('$playerName 启动失败：$e');
+          },
         );
         if (!ok) {
+          AppLog.w(
+            'external',
+            'launchExternalPlayer 返回 false（$playerName），回退内置播放器',
+          );
           _toast('启动 $playerName 失败，已改用内置播放器');
           return false;
         }
+        AppLog.i('external', '$playerName 启动指令已发出');
       }
     } catch (e) {
+      AppLog.e('external', '启动 $playerName 抛异常', e);
       _toast('启动 $playerName 失败：$e');
       return false;
     }
 
     // 播放器已经拉起，历史记录失败不能再回退内置（否则会同时出现两个播放器）。
     app.sourceService.jar.holdPlaybackForExternal();
+    AppLog.i('external', '外部播放器流程完成 player=$playerName，不再进入内置播放器');
     if (app.playerSettings.incognito) {
       // 全局无痕模式：外部播放器同样不写观看历史。
       if (mounted) _toast('已在 $playerName 中打开（无痕模式，未记录历史）');
