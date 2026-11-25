@@ -949,6 +949,7 @@ class AppState extends ChangeNotifier {
     playerSettings = store.loadPlayerSettings();
     sourceService.js.setWorkerCount(playerSettings.jsWorkerPool ? 3 : 1);
     sourceService.jar.setKeepHostsWarm(playerSettings.keepSpiderHosts);
+    sourceService.jar.setServePoolSize(playerSettings.spiderPoolSize);
     proxy = ProxyConfig.fromJsonString(store.proxyJson);
     await _applyEffectiveProxy();
     skipSegments = store.loadSkipSegments();
@@ -1055,6 +1056,7 @@ class AppState extends ChangeNotifier {
     playerSettings = store.loadPlayerSettings();
     sourceService.js.setWorkerCount(playerSettings.jsWorkerPool ? 3 : 1);
     sourceService.jar.setKeepHostsWarm(playerSettings.keepSpiderHosts);
+    sourceService.jar.setServePoolSize(playerSettings.spiderPoolSize);
     skipSegments = store.loadSkipSegments();
     subtitleChoices = store.loadSubtitleChoices();
     driveAccounts = store.loadDriveAccounts();
@@ -3108,6 +3110,7 @@ class AppState extends ChangeNotifier {
       );
       sourceService.js.setWorkerCount(playerSettings.jsWorkerPool ? 3 : 1);
       sourceService.jar.setKeepHostsWarm(playerSettings.keepSpiderHosts);
+      sourceService.jar.setServePoolSize(playerSettings.spiderPoolSize);
     }
     if (data['proxy'] is Map) {
       proxy = ProxyConfig.fromJson(
@@ -3764,6 +3767,7 @@ class AppState extends ChangeNotifier {
     }
     if (keepHostsChanged) {
       sourceService.jar.setKeepHostsWarm(settings.keepSpiderHosts);
+      sourceService.jar.setServePoolSize(settings.spiderPoolSize);
     }
     if (magnetDirChanged) {
       torrentPlay?.setDownloadDir(settings.magnetDownloadDir);

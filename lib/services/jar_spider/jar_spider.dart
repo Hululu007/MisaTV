@@ -226,17 +226,54 @@ class JarSpiderService {
   final Map<String, int> _serveStarting = {};
   final Map<String, int> _serveHostSeq = {};
   final Map<String, Timer> _serveIdleTimers = {};
-  static const _servePoolMax = 3;
+
+  /// 每个 JAR 源最多起几只常驻 JVM（用户可调）。
+  ///
+  /// 原来写死 3。它的作用是「同一源内」的并行度：N 只 host 就能同时处理
+  /// N 个请求；池满后请求要排队（见 _waitServeIdle），不会再被塞进忙碌的
+  /// 管道里串行等死。
+  ///
+  /// 调大有代价：每只 JVM 约 16-128 MB，且冷启动要十几秒。上限 8 是经验值，
+  /// 再多收益很小、内存压力明显。
+  static const int servePoolMin = 1;
+  static const int servePoolMaxLimit = 8;
+  static const int _servePoolMaxDefault = 3;
+  int _servePoolMax = _servePoolMaxDefault;
+
+  /// 池满后轮询空闲 host 的间隔。
+  static const Duration _servePollInterval = Duration(milliseconds: 120);
+
+  /// 当前生效的池大小（供界面回显）。
+  int get servePoolSize => _servePoolMax;
+
+  /// 设置每个 JAR 源的常驻 JVM 上限；超出范围会被夹紧。
+  ///
+  /// 调小不会立刻杀掉已有 host：它们在空闲超时后自然回收，避免打断正在播放
+  /// 的流。调大即时生效（下一次 _acquireServeHost 就会多开）。
+  void setServePoolSize(int value) {
+    final next = value.clamp(servePoolMin, servePoolMaxLimit);
+    if (next == _servePoolMax) return;
+    _servePoolMax = next;
+    AppLog.i('jar', '每个 JAR 源常驻 JVM 上限调整为 $next');
+  }
+
+  int _servePoolMaxFor(String key) => _servePoolMax;
 
   /// 当前搜索轮次：新搜索 / 用户取消 / 时间预算到期时递增，旧轮次排队中的
   /// JAR 调用在真正起进程前自行退出，避免 UI 已放弃而后台还跑几分钟。
   int _searchRound = 0;
 
-  /// 一次性 JVM 的全局并发闸门。serve host 每池最多 3 只，但源失效时会退回
+  /// 一次性 JVM 的全局并发闸门。serve host 每池最多 N 只，但源失效时会退回
   /// 一次性进程；不设全局上限时一轮搜索可能同时起几十只 JVM，CPU/磁盘互相拖慢。
   static const _oneShotMax = 4;
   int _oneShotRunning = 0;
   final List<Completer<void>> _oneShotWaiters = [];
+
+  /// 等待一次性槽位的最长时间。
+  ///
+  /// 以前是 `await waiter.future` 裸等：若某个调用异常路径没走到 finally，
+  /// 等待者会永久挂起并占住槽位，表现为「越用越慢」。
+  static const Duration _oneShotWaitTimeout = Duration(seconds: 45);
   static const _serveIdleDefault = Duration(seconds: 45);
   static const _serveIdleKeepWarm = Duration(minutes: 2);
   Duration _serveIdleTimeout = _serveIdleDefault;
@@ -297,7 +334,17 @@ class JarSpiderService {
     }
     final waiter = Completer<void>();
     _oneShotWaiters.add(waiter);
-    await waiter.future;
+    try {
+      // 必须带超时：万一某个调用没走到 _releaseOneShotSlot（异常路径、进程被杀
+      // 后 completer 未完成），裸等会让这里永久挂起并占住槽位，表现为
+      // 「越搜越慢」——后续的 JAR 调用全排在这一格后面。
+      await waiter.future.timeout(_oneShotWaitTimeout);
+    } on TimeoutException {
+      _oneShotWaiters.remove(waiter);
+      throw ServeHostException(
+        '等待一次性 JVM 槽位超时（${_oneShotWaitTimeout.inSeconds}s），请稍后重试',
+      );
+    }
   }
 
   void _releaseOneShotSlot() {
@@ -4248,7 +4295,7 @@ class JarSpiderService {
   }) async {
     _checkSearchRound();
     final pool = _servePools.putIfAbsent(key, () => <JarServeHost>[]);
-    pool.removeWhere((host) => !host.alive);
+    pool.removeWhere((host) => !host.alive || host.wedged);
 
     // 有空闲 host 就直接复用：顺序搜索（一次只派一个请求）不该反复冷启 JVM。
     // 只有全部在忙、且还没到上限时才多开一只换并行度。
@@ -4271,7 +4318,8 @@ class JarSpiderService {
     }
 
     final starting = _serveStarting[key] ?? 0;
-    if (pool.length + starting < _servePoolMax) {
+    final poolMax = _servePoolMaxFor(key);
+    if (pool.length + starting < poolMax) {
       _serveStarting[key] = starting + 1;
       try {
         _checkSearchRound();
@@ -4334,9 +4382,46 @@ class JarSpiderService {
     }
 
     if (pool.isEmpty) throw ServeHostException('常驻蜘蛛进程启动失败');
-    // 每个 host 是主线程顺序执行：把新请求派给排队最少的那个。
-    pool.sort((a, b) => a.inflight.compareTo(b.inflight));
-    return pool.first;
+    // 池已满（或刚启动失败）：不再把请求塞给正忙的 JVM。
+    //
+    // 每只 host 的主线程是**串行**处理请求的，塞进去只会排在别人后面等；
+    // 一旦前面那个请求超时，整只进程在过去会连带被杀，排队的所有源一起失败
+    // —— 这就是「订阅里 JAR 源一多就丢结果」的根因。
+    //
+    // 现在改为等待池里出现空闲 host（下面 _waitServeIdle），让并发度真正
+    // 等于池大小，而不是表面并发、实际串行。
+    final idle = await _waitServeIdle(key, pool);
+    if (idle == null) {
+      // 等不到空闲（全部卡死 / 被取消）：报错让上层回退一次性进程。
+      throw ServeHostException('常驻蜘蛛池繁忙，未取得可用进程');
+    }
+    return idle;
+  }
+
+  /// 等待池里出现一只空闲（`inflight == 0`）的 host。
+  ///
+  /// [timeout] 到点或当前搜索轮次作废时返回 null，由调用方决定怎么降级。
+  /// 每 [_servePollInterval] 轮询一次：host 的 inflight 由 stdout 应答驱动，
+  /// 没有现成的完成信号可订阅，轮询比给每个 host 挂监听器改动更小、也更稳。
+  Future<JarServeHost?> _waitServeIdle(
+    String key,
+    List<JarServeHost> pool, {
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final deadline = DateTime.now().add(timeout);
+    while (true) {
+      _checkSearchRound();
+      pool.removeWhere((host) => !host.alive || host.wedged);
+      for (final host in pool) {
+        if (host.inflight == 0) return host;
+      }
+      if (pool.isEmpty) return null;
+      if (DateTime.now().isAfter(deadline)) {
+        AppLog.w('jar', '等待常驻 host 空闲超时 key=$key，回退一次性进程');
+        return null;
+      }
+      await Future<void>.delayed(_servePollInterval);
+    }
   }
 
   /// 剔除一只确认不健康的 host：先从池里摘掉，再结束进程；

@@ -391,6 +391,7 @@ class PlayerSettings {
     this.fit = 'contain',
     this.jsWorkerPool = false,
     this.keepSpiderHosts = false,
+    this.spiderPoolSize = 3,
     this.externalPlayers = const [],
     this.defaultPlayer = kDefaultPlayerBuiltin,
     this.immersiveMode = false,
@@ -485,6 +486,7 @@ class PlayerSettings {
     String? fit,
     bool? jsWorkerPool,
     bool? keepSpiderHosts,
+    int? spiderPoolSize,
     List<ExternalPlayerEntry>? externalPlayers,
     String? defaultPlayer,
     bool? immersiveMode,
@@ -519,6 +521,7 @@ class PlayerSettings {
     fit: fit ?? this.fit,
     jsWorkerPool: jsWorkerPool ?? this.jsWorkerPool,
     keepSpiderHosts: keepSpiderHosts ?? this.keepSpiderHosts,
+    spiderPoolSize: (spiderPoolSize ?? this.spiderPoolSize).clamp(1, 8),
     externalPlayers: externalPlayers ?? this.externalPlayers,
     defaultPlayer: normalizeDefaultPlayer(defaultPlayer ?? this.defaultPlayer),
     immersiveMode: immersiveMode ?? this.immersiveMode,
@@ -561,6 +564,13 @@ class PlayerSettings {
   /// 用内存换下一次调用的冷启动时间。
   final bool keepSpiderHosts;
 
+  /// 每个 JAR 源最多起几只常驻 JVM（1–8，默认 3）。
+  ///
+  /// 这是**同一源内**的并行度：调大能让同一个 JAR 源的多个请求真正并行，
+  /// 而不是排在同一只 JVM 的主线程后面串行。代价是内存（每只约 16–128 MB）
+  /// 与冷启动开销。多源搜索时收益不明显，单源连续调用（如体检、详情）更明显。
+  final int spiderPoolSize;
+
   /// 播放器音量（0–1），与系统音量相互独立。
   final double volume;
 
@@ -598,6 +608,7 @@ class PlayerSettings {
     'fit': fit,
     'jsWorkerPool': jsWorkerPool,
     'keepSpiderHosts': keepSpiderHosts,
+    'spiderPoolSize': spiderPoolSize,
     'externalPlayers': externalPlayers.map((e) => e.toJson()).toList(),
     'defaultPlayer': defaultPlayer,
     'immersiveMode': immersiveMode,
@@ -658,6 +669,8 @@ class PlayerSettings {
       fit: normalizePlayerFit((j['fit'] ?? '').toString()).name,
       jsWorkerPool: (j['jsWorkerPool'] as bool?) ?? false,
       keepSpiderHosts: (j['keepSpiderHosts'] as bool?) ?? false,
+      // 旧档案没有这个字段：回落到默认 3，与引入设置前的行为一致。
+      spiderPoolSize: ((j['spiderPoolSize'] as num?)?.toInt() ?? 3).clamp(1, 8),
       externalPlayers: _externalPlayersFromJson(j['externalPlayers']),
       defaultPlayer: normalizeDefaultPlayer(
         (j['defaultPlayer'] ?? '').toString(),

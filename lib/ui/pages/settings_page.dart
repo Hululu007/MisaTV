@@ -1983,6 +1983,8 @@ class SettingsPageState extends State<SettingsPage> {
                             ),
                             contentPadding: EdgeInsets.zero,
                           ),
+                          const Divider(height: 24),
+                          _SpiderPoolSizeTile(app: app),
                         ],
                       ),
                     ),

@@ -337,6 +337,23 @@ class JarServeHost {
     return host;
   }
 
+  /// 连续多少次「单次调用超时」才判定整只 host 已卡死。
+  ///
+  /// 以前只要一次超时就 `killNow()`。问题是同一只 JVM 的主线程是**串行**处理
+  /// 请求的：排在前面的请求超时被杀时，后面排队的请求会一起收到「进程已退出」，
+  /// 于是「一个慢源」连锁拖垮同池的其它源（用户感受就是丢结果）。
+  ///
+  /// 现在把「单次失败」与「进程卡死」解耦：超时只让当前请求失败，等主线程
+  /// 处理完前面的请求、轮到没有应答时再累计。连续 [_deadAfterTimeouts] 次都
+  /// 没恢复才杀进程。
+  static const int _deadAfterTimeouts = 2;
+
+  /// 连续超时计数：任何一次成功应答都清零。
+  int _consecutiveTimeouts = 0;
+
+  /// 该 host 是否已被判定卡死（不再接收新请求）。
+  bool get wedged => _consecutiveTimeouts >= _deadAfterTimeouts;
+
   Future<ServeReply> call({
     required String className,
     required String method,
@@ -370,10 +387,19 @@ class JarServeHost {
       }
       final reply = await completer.future.timeout(timeout);
       lastUsedAt = DateTime.now();
+      // 成功应答说明主线程是活的：超时计数清零。
+      _consecutiveTimeouts = 0;
       return reply;
     } on TimeoutException {
-      // 主线程被卡死的蜘蛛不会自行恢复：直接结束这个 host，后续请求换新进程。
-      unawaited(killNow());
+      // 单次超时**不**立刻杀进程：同池还排着别的源的请求，杀掉会一起连累。
+      // 只累计次数，连续多次仍无应答才认为主线程卡死（见 wedged）。
+      _consecutiveTimeouts++;
+      if (_consecutiveTimeouts >= _deadAfterTimeouts) {
+        unawaited(killNow());
+        throw ServeHostException(
+          '常驻蜘蛛连续 $_deadAfterTimeouts 次调用超时，进程已重启（$method）',
+        );
+      }
       throw ServeHostException('常驻蜘蛛调用超时（$method）');
     } finally {
       _pending.remove(id);
