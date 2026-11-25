@@ -12,6 +12,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../app.dart';
 import '../parse_play.dart';
+import 'player/chrome_auto_hide.dart';
 import '../../core/logging/app_log.dart';
 import '../../core/logging/log_redact.dart';
 import '../../core/platform/sleep_inhibitor.dart';
@@ -339,8 +340,30 @@ class _PlayerPageState extends State<PlayerPage>
   /// 静音前的音量，取消静音时恢复。
   double _lastVolume = 1.0;
   int _openSeq = 0;
+
+  /// 光标自动隐藏的计时器（只负责光标）。
+  ///
+  /// 与控制栏的倒计时分成两套：控制栏那份可能被「鼠标停在栏上」随时取消，
+  /// 光标这份是独立的，共用一个 Timer 会让它们互相打断。
   Timer? _hideTimer;
   Timer? _saveTimer;
+
+  /// 控制栏（顶栏 / 底栏）的自动隐藏策略。
+  ///
+  /// 原来的 4 秒定时从「单击唤出」那一刻起算，用户还在栏里找按钮就整条消失，
+  /// 经常来不及点。现在鼠标停在上下栏上时保持显示，离开后重新计时。
+  /// 规则与单测都在 `player/chrome_auto_hide.dart`。
+  late final PlayerChromeAutoHide _chromeAutoHide = PlayerChromeAutoHide(
+    hideDelay: const Duration(seconds: 4),
+    isPlaying: () => _playing,
+    onHide: () {
+      if (!mounted) return;
+      setState(() {
+        _controls = false;
+        _cursorVisible = false;
+      });
+    },
+  );
 
   /// 一起看：是否已绑定房间状态监听，以及上次广播时间（节流）。
   bool _partyBound = false;
@@ -461,8 +484,18 @@ class _PlayerPageState extends State<PlayerPage>
       duration: const Duration(milliseconds: 260),
       value: 1,
     );
-    _hideTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _controls = false);
+    // 首屏先把控制栏收起来（进播放器就直接看画面），用户单击再唤出。
+    //
+    // 不用 `_hideTimer`：那个计时器归光标逻辑所有（[_onPointerMove] 会重建它），
+    // 借用会被后续的鼠标移动覆盖掉。也不用 `_chromeAutoHide`：它刻意在暂停时
+    // 不生效，而此刻还没开始播放。
+    Future<void>.delayed(const Duration(seconds: 3), () {
+      if (mounted && !_playing && _controls) {
+        setState(() {
+          _controls = false;
+          _cursorVisible = false;
+        });
+      }
     });
     MpvExtension.instance.isInstalled.then((value) {
       if (mounted) setState(() => _mpvReady = value);
@@ -1865,16 +1898,14 @@ class _PlayerPageState extends State<PlayerPage>
       _controls = true;
       _cursorVisible = true;
     });
-    _hideTimer?.cancel();
-    _hideTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && _playing) {
-        setState(() {
-          _controls = false;
-          _cursorVisible = false;
-        });
-      }
-    });
+    _chromeAutoHide.schedule();
   }
+
+  /// 鼠标进入 / 离开顶栏与底栏。
+  ///
+  /// 进入：取消倒计时，控制栏保持显示；
+  /// 离开：重新开始倒计时，行为与「唤出后不作任何操作」一致。
+  void _onChromeHover(bool hovering) => _chromeAutoHide.setHovering(hovering);
 
   /// 鼠标移动**不再**唤出控制栏（控制栏改为单击唤出）。
   ///
@@ -1928,9 +1959,9 @@ class _PlayerPageState extends State<PlayerPage>
   void _toggleControls() {
     if (!mounted) return;
     if (_controls) {
-      // 收缩：光标一起收，并取消待执行的自动收设计时器，
+      // 收缩：光标一起收，并取消待执行的自动收起倒计时，
       // 否则下次唤出后旧的计时器可能立刻把控制栏又收掉。
-      _hideTimer?.cancel();
+      _chromeAutoHide.cancel();
       setState(() {
         _controls = false;
         _cursorVisible = false;
@@ -2444,6 +2475,7 @@ class _PlayerPageState extends State<PlayerPage>
       unawaited(_app.sourceService.jar.stopPlayback());
     }
     _hideTimer?.cancel();
+    _chromeAutoHide.dispose();
     _saveTimer?.cancel();
     _detailsTimer?.cancel();
     _driveSlowTimer?.cancel();
@@ -3282,22 +3314,26 @@ class _PlayerPageState extends State<PlayerPage>
       left: 0,
       right: 0,
       top: 0,
-      child: Container(
-        padding: EdgeInsets.fromLTRB(
-          8,
-          MediaQuery.paddingOf(context).top + 8,
-          12,
-          24,
-        ),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xCC000000), Colors.transparent],
+      // 鼠标停在这条栏上时保持显示，移开后再倒计时收起（见 _onChromeHover）。
+      child: MouseRegion(
+        onEnter: (_) => _onChromeHover(true),
+        onExit: (_) => _onChromeHover(false),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(
+            8,
+            MediaQuery.paddingOf(context).top + 8,
+            12,
+            24,
           ),
-        ),
-        // 播放器页没有自绘标题栏，顶栏这一行同时作为窗口拖拽区。
-        child: windowDragArea(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xCC000000), Colors.transparent],
+            ),
+          ),
+          // 播放器页没有自绘标题栏，顶栏这一行同时作为窗口拖拽区。
+          child: windowDragArea(
           Row(
             children: [
               if (!mini)
@@ -3398,6 +3434,14 @@ class _PlayerPageState extends State<PlayerPage>
                     color: Colors.white,
                   ),
                 ),
+              // 最小化到任务栏：只在桌面窗口有意义（移动端没有窗口，
+              // 全屏时缩下去会让人以为播放器崩了）。
+              if (!mini && _isDesktop && !_fullscreen)
+                IconButton(
+                  tooltip: '最小化',
+                  onPressed: () => unawaited(minimizeAppWindow()),
+                  icon: const Icon(Icons.remove_rounded, color: Colors.white),
+                ),
               if (!mini && hasCustomWindowChrome)
                 IconButton(
                   tooltip: '退出软件',
@@ -3410,6 +3454,7 @@ class _PlayerPageState extends State<PlayerPage>
             ],
           ),
           enabled: !_fullscreen,
+        ),
         ),
       ),
     );
@@ -3508,21 +3553,25 @@ class _PlayerPageState extends State<PlayerPage>
       left: 0,
       right: 0,
       bottom: 0,
-      child: Container(
-        padding: EdgeInsets.fromLTRB(
-          14,
-          30,
-          14,
-          MediaQuery.paddingOf(context).bottom + 10,
-        ),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.bottomCenter,
-            end: Alignment.topCenter,
-            colors: [Color(0xDD000000), Colors.transparent],
+      // 与顶栏一致：鼠标停在这条栏上时不自动收起。
+      child: MouseRegion(
+        onEnter: (_) => _onChromeHover(true),
+        onExit: (_) => _onChromeHover(false),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(
+            14,
+            30,
+            14,
+            MediaQuery.paddingOf(context).bottom + 10,
           ),
-        ),
-        child: Column(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [Color(0xDD000000), Colors.transparent],
+            ),
+          ),
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (_live)
@@ -3792,6 +3841,7 @@ class _PlayerPageState extends State<PlayerPage>
               ],
             ),
           ],
+        ),
         ),
       ),
     );
