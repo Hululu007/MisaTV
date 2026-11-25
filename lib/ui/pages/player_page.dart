@@ -3255,10 +3255,16 @@ class _PlayerPageState extends State<PlayerPage>
                                   children: [
                                     if (!_live)
                                       _roundButton(
-                                        icon: Icons.replay_10_rounded,
-                                        onTap: () => _seekBy(
-                                          const Duration(seconds: -10),
-                                        ),
+                                        icon: _isMobile
+                                            ? Icons.skip_previous_rounded
+                                            : Icons.replay_10_rounded,
+                                        onTap: _isMobile
+                                            ? (_index > 0
+                                                ? () => _switchTo(_index - 1)
+                                                : null)
+                                            : () => _seekBy(
+                                                const Duration(seconds: -10),
+                                              ),
                                       ),
                                     if (!_live) const SizedBox(width: 22),
                                     _roundButton(
@@ -3271,10 +3277,16 @@ class _PlayerPageState extends State<PlayerPage>
                                     if (!_live) const SizedBox(width: 22),
                                     if (!_live)
                                       _roundButton(
-                                        icon: Icons.forward_10_rounded,
-                                        onTap: () => _seekBy(
-                                          const Duration(seconds: 10),
-                                        ),
+                                        icon: _isMobile
+                                            ? Icons.skip_next_rounded
+                                            : Icons.forward_10_rounded,
+                                        onTap: _isMobile
+                                            ? (_index + 1 < _episodes.length
+                                                ? () => _switchTo(_index + 1)
+                                                : null)
+                                            : () => _seekBy(
+                                                const Duration(seconds: 10),
+                                              ),
                                       ),
                                   ],
                                 ),
@@ -3660,8 +3672,9 @@ class _PlayerPageState extends State<PlayerPage>
                 ],
               ),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                if (!_live)
+                if (!_isMobile && !_live)
                   IconButton(
                     tooltip: '上一集',
                     onPressed: _index > 0 ? () => _switchTo(_index - 1) : null,
@@ -3670,15 +3683,16 @@ class _PlayerPageState extends State<PlayerPage>
                       color: _index > 0 ? Colors.white : Colors.white24,
                     ),
                   ),
-                IconButton(
-                  tooltip: _playing ? '暂停' : '播放',
-                  onPressed: _togglePlay,
-                  icon: Icon(
-                    _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    color: Colors.white,
+                if (!_isMobile)
+                  IconButton(
+                    tooltip: _playing ? '暂停' : '播放',
+                    onPressed: _togglePlay,
+                    icon: Icon(
+                      _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                if (!_live)
+                if (!_isMobile && !_live)
                   IconButton(
                     tooltip: '下一集',
                     onPressed: _index + 1 < _episodes.length
@@ -3691,7 +3705,7 @@ class _PlayerPageState extends State<PlayerPage>
                           : Colors.white24,
                     ),
                   ),
-                IconButton(
+              IconButton(
                   tooltip: '刷新（重新取流）',
                   onPressed: (_refreshing || _resolving)
                       ? null
@@ -3720,11 +3734,14 @@ class _PlayerPageState extends State<PlayerPage>
                   icon: Icon(_volumeIcon, color: Colors.white),
                 ),
                 Expanded(
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 2,
-                    children: [
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
                       if (!_live)
                         Tooltip(
                           message: '弹幕：点击开关，长按调节速度 / 屏占 / 屏蔽词',
@@ -3750,16 +3767,45 @@ class _PlayerPageState extends State<PlayerPage>
                           label: '音轨',
                           onTap: _showAudioTracks,
                         ),
-                      if (!_live)
+                      if (!_live && _isMobile) ...[
                         Tooltip(
-                          message: '跳过片头 / 片尾：${_skipSummary()}',
+                          message: _skipIntro > 0
+                              ? '点按以当前进度覆盖片头，长按精确调整/清除${_skipInheritedFrom.isEmpty ? '' : '（来自$_skipInheritedFrom）'}'
+                              : '点按以当前进度设为片头，长按精确设置',
                           child: _barAction(
-                            icon: Icons.content_cut_rounded,
-                            label: '跳过',
-                            active: _skipIntro > 0 || _skipOutro > 0,
-                            onTap: _showSkipSettings,
+                            icon: Icons.first_page_rounded,
+                            label: _skipIntro > 0
+                                ? '片头 ${_fmt(Duration(seconds: _skipIntro))}'
+                                : '片头',
+                            active: _skipIntro > 0,
+                            onTap: _markSkipIntroFromCurrent,
+                            onLongPress: _showSkipSettings,
                           ),
                         ),
+                        Tooltip(
+                          message: _skipOutro > 0
+                              ? '点按以当前剩余时长覆盖片尾，长按精确调整/清除${_skipInheritedFrom.isEmpty ? '' : '（来自$_skipInheritedFrom）'}'
+                              : '点按以当前剩余时长设为片尾，长按精确设置',
+                          child: _barAction(
+                            icon: Icons.last_page_rounded,
+                            label: _skipOutro > 0
+                                ? '片尾 ${_fmt(Duration(seconds: _skipOutro))}'
+                                : '片尾',
+                            active: _skipOutro > 0,
+                            onTap: _markSkipOutroFromCurrent,
+                            onLongPress: _showSkipSettings,
+                          ),
+                        ),
+                        ] else if (!_live)
+                          Tooltip(
+                            message: '跳过片头 / 片尾：${_skipSummary()}',
+                            child: _barAction(
+                              icon: Icons.content_cut_rounded,
+                              label: '跳过',
+                              active: _skipIntro > 0 || _skipOutro > 0,
+                              onTap: _showSkipSettings,
+                              ),
+                            ),
                       _barAction(
                         icon: Icons.analytics_outlined,
                         label: '详情',
@@ -3806,6 +3852,8 @@ class _PlayerPageState extends State<PlayerPage>
                           ),
                         ),
                       ),
+               ],
+                       ), ), ), ),
                 if (_isAndroid)
                   IconButton(
                     tooltip: _portraitFullscreen ? '横屏全屏' : '竖屏全屏',
@@ -3835,9 +3883,6 @@ class _PlayerPageState extends State<PlayerPage>
                           color: Colors.white,
                         ),
                       ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ],
@@ -3849,7 +3894,7 @@ class _PlayerPageState extends State<PlayerPage>
 
   Widget _roundButton({
     required IconData icon,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
     double size = 52,
   }) {
     return Material(
@@ -3861,7 +3906,10 @@ class _PlayerPageState extends State<PlayerPage>
         child: SizedBox(
           width: size,
           height: size,
-          child: Icon(icon, color: Colors.white, size: size * 0.5),
+          child: Icon(icon,
+                     color: onTap == null ? Colors.white24 : Colors.white,
+                     size: size * 0.5,
+                     ),
         ),
       ),
     );
