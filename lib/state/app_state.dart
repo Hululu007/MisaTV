@@ -1297,10 +1297,78 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  /// 供单测使用：暴露私有的 .js.md5 识别逻辑。
+  @visibleForTesting
+  static String? catJsMd5TargetForTest(String url) => _catJsMd5Target(url);
+
+  /// 把 `xxx.js.md5` 识别成猫源脚本地址；不是这类地址时返回 null。
+  ///
+  /// CatVod 生态里 `xxx.js.md5` 是一个**校验摘要文件**（内容是 32 位十六进制
+  /// md5），真正的蜘蛛脚本在同目录的 `xxx.js`。实测：
+  ///   `https://9280.kstore.vip/cat/index.js.md5` → 32 字节 hex
+  ///   `https://9280.kstore.vip/cat/index.js`     → 6.6 MB 脚本，
+  ///   且它的 md5 与摘要文件完全一致。
+  ///
+  /// 除了 `.js.md5`，也兼容 `.js.md5?x=1` 这种带查询串的写法。
+  static String? _catJsMd5Target(String url) {
+    final trimmed = url.trim();
+    final lower = trimmed.toLowerCase();
+    // 必须是 http(s)，且路径以 .js.md5 结尾（查询串 / 片段允许存在）。
+    if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
+      return null;
+    }
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null) return null;
+    final path = uri.path.toLowerCase();
+    if (!path.endsWith('.js.md5')) return null;
+    // 去掉末尾的 `.md5`，保留原始大小写与查询串。
+    final cut = trimmed.toLowerCase().lastIndexOf('.md5');
+    if (cut < 0) return null;
+    return trimmed.substring(0, cut) + trimmed.substring(cut + 4);
+  }
+
+  /// 生成只含一个 JS 蜘蛛源的 TVBox 配置。
+  ///
+  /// [api] 指向脚本地址；type=3 走既有的 QuickJS 链路（内置 ESM→CJS、
+  /// cheerio / CryptoJS），不需要额外的 jar 或 Python 运行时。
+  static String _jsSpiderConfig({required String name, required String api}) {
+    final key = 'js_${api.hashCode.toRadixString(36)}';
+    return const JsonEncoder.withIndent('  ').convert({
+      'sites': [
+        {
+          'key': key,
+          'name': name,
+          'type': 3,
+          'api': api,
+          'searchable': 1,
+          'quickSearch': 1,
+          'filterable': 1,
+        },
+      ],
+    });
+  }
+
   Future<({String text, String url, String baseUrl, String name})>
   _loadImportUrl(String url, {String? name}) async {
     final trimmed = url.trim();
     if (trimmed.isEmpty) throw AppException('请输入订阅地址');
+    // CatVod 猫源常见写法：`xxx.js.md5` 本身只是一个 md5 摘要文件
+    // （32 个十六进制字符），真正的蜘蛛脚本在同目录去掉 `.md5` 的 `xxx.js`。
+    // 直接按订阅导入会拿到一坨 hex 而报「不是 TVBox 配置」，这里先认出来，
+    // 转成一条 type=3 的 JS 蜘蛛源。
+    final md5Spider = _catJsMd5Target(trimmed);
+    if (md5Spider != null) {
+      final label = (name ?? '').trim().isNotEmpty
+          ? name!.trim()
+          : _nameFromUrl(trimmed, profiles.length + 1);
+      AppLog.i('import', '识别为猫源 .js.md5，脚本地址=$md5Spider');
+      return (
+        text: _jsSpiderConfig(name: label, api: md5Spider),
+        url: '',
+        baseUrl: '',
+        name: label,
+      );
+    }
     // 先只读开头几十 KB：直播单常常有好几 MB 且生成很慢，整份下完再判断
     // 会让导入卡几十秒甚至超时。开头认出是 M3U / TXT 就直接登记为直播订阅，
     // 直播页打开时再按需拉整份。
