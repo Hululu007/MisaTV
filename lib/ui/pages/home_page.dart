@@ -533,7 +533,7 @@ class _HomePageState extends State<HomePage> {
         const gridSpacing = 14.0;
         var maxExtent = 188.0;
         var mainExtent = 292.0;
-       final SliverGridDelegate gridDelegate;
+        final SliverGridDelegate gridDelegate;
         if (columns >= 2) {
           final gridWidth = maxContent - gridPadding * 2;
           final extent = gridWidth > 0
@@ -545,9 +545,9 @@ class _HomePageState extends State<HomePage> {
             mainAxisExtent: cardWidth * 292 / 188,
             crossAxisSpacing: gridSpacing,
             mainAxisSpacing: 18,
-          ); 
+          );
         } else {
-           if (!kIsWeb &&
+          if (!kIsWeb &&
               defaultTargetPlatform == TargetPlatform.android &&
               MediaQuery.orientationOf(context) == Orientation.portrait) {
             // 安卓手机竖屏：自动模式下至少排 3 个封面，避免一行只有两张、
@@ -559,13 +559,13 @@ class _HomePageState extends State<HomePage> {
               mainExtent = maxExtent * 1.5 + 44;
             }
           }
-         gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: maxExtent,
-          mainAxisExtent: mainExtent,
-          crossAxisSpacing: gridSpacing,
-          mainAxisSpacing: 18,
-           );   
-         }
+          gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: maxExtent,
+            mainAxisExtent: mainExtent,
+            crossAxisSpacing: gridSpacing,
+            mainAxisSpacing: 18,
+          );
+        }
         return Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxContent),
