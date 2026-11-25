@@ -230,7 +230,6 @@ class AppState extends ChangeNotifier {
   /// 打断体验很差。播放器页在 initState / dispose 里设置与清除。
   bool isPlayingSomething = false;
 
-
   /// 「一起看」房间状态（房主 / 观众）。
   late final WatchPartyService watchParty = WatchPartyService(
     deviceName: () => syncDeviceName,
@@ -4319,6 +4318,12 @@ class AppState extends ChangeNotifier {
 
   Future<int> startLanSyncServer() async {
     final port = await lanServer.start();
+    // 端口可用后立刻进入「被动就绪」：只应答别人的流转探测，不广播。
+    // 这样即使本机从没点过流转，别的设备也能在列表里看到本机。
+    lanDiscovery
+      ..localPort = port
+      ..platform = flowDevicePlatform;
+    unawaited(lanDiscovery.listenOnly());
     notifyListeners();
     return port;
   }
@@ -4336,18 +4341,23 @@ class AppState extends ChangeNotifier {
   /// 设备流转是否已就绪（发现服务在跑）。
   bool get flowReady => lanDiscovery.running;
 
-  /// 打开「设备流转」：启动局域网服务 + UDP 发现。
+  /// 临时开启设备流转：启动局域网服务 + UDP 发现。
+  ///
+  /// 流转是**一次性**的（像投屏），不持久化开关。每次打开流转面板时调用，
+  /// 面板关闭或流转完成后由 [stopFlow] 收起，不留后台广播。
   ///
   /// 复用局域网同步服务的 HTTP 端口（`/flow` 与 `/sync` 同一个服务），
   /// 所以这里只需要保证服务起来，并把端口告诉发现模块用于公告。
   Future<void> startFlow() async {
     try {
+      // 先让 HTTP 端口可用（否则对端 probe 过来时本机应答里没有端口，
+      // 或者对端连不上），再启动 UDP 侧去广播「谁在？」。
       final port = await startLanSyncServer();
       lanDiscovery
         ..localPort = port
         ..platform = flowDevicePlatform;
       await lanDiscovery.start();
-      AppLog.i('lan', '设备流转已就绪：端口 $port');
+      AppLog.i('lan', '设备流转已临时开启：端口 $port');
       notifyListeners();
     } catch (e) {
       AppLog.w('lan', '设备流转启动失败', e);
@@ -4355,9 +4365,18 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// 关闭设备流转。正在播放不受影响，只是不再被发现、不再接收推送。
+  /// 收起设备流转（面板关闭 / 流转完成 / 用户取消）。
+  ///
+  /// 注意：正在播放不受影响，只是不再被发现、不再接收新的推送。
   Future<void> stopFlow() async {
+    if (!lanDiscovery.running) return;
+    // 只停 UDP（不再广播 / 不再刷新设备列表）。
+    //
+    // **不停 HTTP 服务**：那是接收端点，别的设备 probe 过来时要靠它应答。
+    // 只监听本机端口、不产生任何广播，开销可以忽略；停了会导致本机
+    // 既发现不了别人、也收不到推送。
     await lanDiscovery.stop();
+    AppLog.i('lan', '设备流转已收起（接收端点保持可用）');
     notifyListeners();
   }
 
@@ -4380,7 +4399,6 @@ class AppState extends ChangeNotifier {
       return false;
     }
   }
-
 
   // ---- 媒体库 ----
 

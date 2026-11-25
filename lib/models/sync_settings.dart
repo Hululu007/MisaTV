@@ -9,7 +9,6 @@ class SyncSettings {
     this.lastSyncAt = 0,
     this.lanToken = '',
     this.deviceId = '',
-    this.flowEnabled = false,
   });
 
   /// 远端同步文件的默认路径（相对 WebDAV 服务器基址）。
@@ -36,12 +35,6 @@ class SyncSettings {
   /// 留空时由 [ensureDeviceId] 生成。
   final String deviceId;
 
-  /// 「设备流转」是否启用。
-  ///
-  /// 只有开着时才启动 UDP 发现 + 接收端点：平时不必占端口、发广播。
-  /// 记在设置里是为了重启后自动恢复，否则每次启动都要手动点一次。
-  final bool flowEnabled;
-
   /// 没有 deviceId 时生成一个并返回新实例（首次启动 / 旧档案升级走这里）。
   SyncSettings ensureDeviceId() {
     if (deviceId.trim().isNotEmpty) return this;
@@ -59,7 +52,6 @@ class SyncSettings {
     int? lastSyncAt,
     String? lanToken,
     String? deviceId,
-    bool? flowEnabled,
   }) => SyncSettings(
     deviceName: deviceName ?? this.deviceName,
     davServerId: davServerId ?? this.davServerId,
@@ -67,7 +59,6 @@ class SyncSettings {
     lastSyncAt: lastSyncAt ?? this.lastSyncAt,
     lanToken: lanToken ?? this.lanToken,
     deviceId: deviceId ?? this.deviceId,
-    flowEnabled: flowEnabled ?? this.flowEnabled,
   );
 
   Map<String, dynamic> toJson() => {
@@ -77,7 +68,6 @@ class SyncSettings {
     'lastSyncAt': lastSyncAt,
     'lanToken': lanToken,
     'deviceId': deviceId,
-    'flowEnabled': flowEnabled,
   };
 
   factory SyncSettings.fromJson(Map<String, dynamic> json) {
@@ -89,7 +79,6 @@ class SyncSettings {
       lastSyncAt: (json['lastSyncAt'] as num?)?.toInt() ?? 0,
       lanToken: (json['lanToken'] ?? '').toString(),
       deviceId: (json['deviceId'] ?? '').toString(),
-      flowEnabled: (json['flowEnabled'] as bool?) ?? false,
     );
   }
 

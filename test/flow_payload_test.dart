@@ -91,19 +91,22 @@ void main() {
       expect(a, isNot(b));
     });
 
-    test('JSON 往返保留 deviceId 与 flowEnabled', () {
-      final settings = const SyncSettings().ensureDeviceId().copyWith(
-        flowEnabled: true,
-      );
+    test('JSON 往返保留 deviceId', () {
+      final settings = const SyncSettings().ensureDeviceId();
       final back = SyncSettings.fromJson(settings.toJson());
       expect(back.deviceId, settings.deviceId);
-      expect(back.flowEnabled, isTrue);
     });
 
-    test('旧档案缺字段时 flowEnabled=false、deviceId 为空', () {
+    test('旧档案缺字段时 deviceId 为空', () {
       final back = SyncSettings.fromJson(const {});
-      expect(back.flowEnabled, isFalse);
       expect(back.deviceId, '');
+    });
+
+    // 流转是**一次性**操作（像投屏），不持久化开关：
+    // 设置里不该出现任何「是否开启流转」的字段。
+    test('SyncSettings 里没有流转开关', () {
+      final json = const SyncSettings().toJson();
+      expect(json.containsKey('flowEnabled'), isFalse);
     });
   });
 }

@@ -98,6 +98,61 @@ class LanDiscovery {
   /// 设备列表变化时推送（界面订阅它刷新）。
   Stream<List<LanDevice>> get changes => _controller.stream;
 
+  /// 是否处于「主动寻找」模式（用户打开了流转面板）。
+  ///
+  /// 区分两种运行态：
+  ///   · **被动就绪**（[listenOnly]）：只监听别人的 probe 并应答，不广播。
+  ///     应用启动后只要有局域网服务就进入这个状态，别的设备才找得到本机。
+  ///   · **主动寻找**（[start]）：周期广播 probe，并在面板里列出发现的设备。
+  bool _active = false;
+
+  bool get active => _active;
+
+  /// 进入被动监听：只应答 probe，不主动广播。
+  ///
+  /// 与 [start] 共用同一个 socket；已经 start 过就直接标记为 active。
+  Future<bool> listenOnly() async {
+    if (_socket != null) {
+      _active = true;
+      _timer?.cancel();
+      _timer = Timer.periodic(announceInterval, (_) => probeNow());
+      probeNow();
+      return true;
+    }
+    final opened = await _openSocket();
+    if (opened) {
+      _active = true;
+      _timer?.cancel();
+      _timer = Timer.periodic(announceInterval, (_) => probeNow());
+      probeNow();
+    }
+    return opened;
+  }
+
+  Future<bool> _openSocket() async {
+    if (_socket != null) return true;
+    try {
+      final socket = await RawDatagramSocket.bind(
+        InternetAddress.anyIPv4,
+        discoveryPort,
+        reuseAddress: true,
+        reusePort: false,
+      );
+      socket.broadcastEnabled = true;
+      socket.listen(
+        _onEvent,
+        onError: (Object e) {
+          AppLog.w('lan', '设备发现监听异常：$e');
+        },
+      );
+      _socket = socket;
+      return true;
+    } catch (e) {
+      AppLog.w('lan', '设备发现启动失败：$e');
+      return false;
+    }
+  }
+
   Future<void> start() async {
     if (_socket != null) return;
     try {
@@ -115,9 +170,10 @@ class LanDiscovery {
         },
       );
       _socket = socket;
-      _timer = Timer.periodic(announceInterval, (_) => _announce());
-      // 启动后立即公告一次，别让用户等第一个周期。
-      _announce();
+      // 打开面板期间周期广播「谁在？」：接收方只在被问到时才应答，
+      // 所以本机不需要常驻公告，关掉面板就不再有任何广播。
+      _timer = Timer.periodic(announceInterval, (_) => probeNow());
+      probeNow();
       AppLog.i('lan', '设备发现已启动（UDP $discoveryPort）');
     } catch (e) {
       // 端口被占用等：不影响播放，只是发现不了设备。
@@ -125,17 +181,28 @@ class LanDiscovery {
     }
   }
 
+  /// 结束「主动寻找」：停止广播与设备列表刷新，但**保留 socket**。
+  ///
+  /// 保留是为了继续被动应答别人的 probe —— 否则本机在别人眼里就消失了。
+  /// 真正关闭 socket 见 [close]。
   Future<void> stop() async {
     _timer?.cancel();
     _timer = null;
+    _active = false;
+    _devices.clear();
+    AppLog.i('lan', '设备发现已转为被动监听');
+  }
+
+  /// 彻底关闭（应用退出时调用）。
+  Future<void> close() async {
+    await stop();
     _socket?.close();
     _socket = null;
-    _devices.clear();
-    AppLog.i('lan', '设备发现已停止');
+    AppLog.i('lan', '设备发现已关闭');
   }
 
   void dispose() {
-    unawaited(stop());
+    unawaited(close());
     unawaited(_controller.close());
   }
 
@@ -144,7 +211,11 @@ class LanDiscovery {
     if (_devices.remove(id) != null) _emit();
   }
 
-  void _announce() {
+  /// 应答别人的「谁在？」探测。
+  ///
+  /// 流转是一次性操作：推送方点开面板时才广播 probe，接收方**只在被问到时**
+  /// 回一条 announce。这样接收端不需要常驻广播，也能被找到。
+  void _replyToProbe(Datagram probe) {
     final socket = _socket;
     if (socket == null || localPort <= 0) return;
     try {
@@ -158,9 +229,24 @@ class LanDiscovery {
           'platform': platform,
         }),
       );
+      // 只回给问的人，不做广播，避免打扰同网段其它设备。
+      socket.send(payload, probe.address, discoveryPort);
+    } catch (_) {
+      // 单次应答失败无所谓，下次 probe 还会有机会。
+    }
+  }
+
+  /// 主动广播一次「谁在？」（推送方打开面板时调用）。
+  void probeNow() {
+    final socket = _socket;
+    if (socket == null) return;
+    try {
+      final payload = utf8.encode(
+        jsonEncode({'app': 'MisaTV', 'kind': 'flow-probe', 'id': deviceId}),
+      );
       socket.send(payload, InternetAddress('255.255.255.255'), discoveryPort);
     } catch (e) {
-      AppLog.w('lan', '设备公告发送失败：$e');
+      AppLog.w('lan', '设备探测发送失败：$e');
     }
   }
 
@@ -176,9 +262,17 @@ class LanDiscovery {
       final text = utf8.decode(datagram.data);
       final decoded = jsonDecode(text);
       if (decoded is! Map) return;
-      if (decoded['app'] != 'MisaTV' || decoded['kind'] != 'flow-announce') {
+      if (decoded['app'] != 'MisaTV') return;
+      final kind = (decoded['kind'] ?? '').toString();
+      if (kind == 'flow-probe') {
+        // 别人在找设备：回一条 announce 给对方（不广播）。
+        // 自己发的 probe 也会收到，忽略即可。
+        if ((decoded['id'] ?? '').toString() != deviceId) {
+          _replyToProbe(datagram);
+        }
         return;
       }
+      if (kind != 'flow-announce') return;
       final id = (decoded['id'] ?? '').toString();
       // 忽略自己的广播（同一台机器也可能收到自己的包）。
       if (id.isEmpty || id == deviceId) return;

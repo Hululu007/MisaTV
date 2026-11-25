@@ -136,27 +136,6 @@ class _SyncPageState extends State<SyncPage> {
     }
   }
 
-  /// 开关设备流转：启动 / 停止 UDP 发现，并把开关状态落盘（重启后自动恢复）。
-  Future<void> _toggleFlow(AppState app, bool enabled) async {
-    setState(() {
-      _busy = true;
-      _error = '';
-    });
-    try {
-      if (enabled) {
-        await app.startFlow();
-      } else {
-        await app.stopFlow();
-      }
-      final next = app.syncSettings.copyWith(flowEnabled: enabled);
-      await app.saveSyncSettings(next);
-    } catch (e) {
-      if (mounted) setState(() => _error = _describe(e));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   Future<void> _syncFromLan(AppState app) async {
     final url = TextEditingController();
     final token = TextEditingController();
@@ -401,26 +380,21 @@ class _SyncPageState extends State<SyncPage> {
             title: '设备流转',
             icon: Icons.devices_rounded,
             children: [
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                value: settings.flowEnabled,
-                onChanged: _busy ? null : (v) => _toggleFlow(app, v),
-                title: const Text('允许接收设备流转'),
-                subtitle: Text(
-                  settings.flowEnabled
-                      ? '已启用 · 同一局域网的其他 MisaTV 能把正在播的剧集推送到本机'
-                      : '开启后本机会在局域网里被其他设备发现，并可接收它们推来的播放',
-                ),
-              ),
-              const SizedBox(height: 6),
               Text(
-                '流转只传「播放地址 + 片名/集数」，不传订阅与账号凭据。\n'
-                '推送方会退出自己的播放器；接收方播完退出后，'
-                '如果开启了 WebDAV 同步，会自动同步一次观看历史，'
-                '方便其他设备续播。',
+                '在播放器里点「流转」，选择同一局域网的另一台 MisaTV，'
+                '就能把正在看的这一集推过去接着播。',
+                style: theme.textTheme.bodySmall?.copyWith(height: 1.6),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '· 像投屏一样是一次性操作：点一次用一次，不常驻后台广播。\n'
+                '· 推送方会自动退出播放器；本机会在对方点流转时被临时发现。\n'
+                '· 只传「播放地址 + 片名/集数」，不传订阅与账号凭据。\n'
+                '· 接收方播完退出后，若已配置 WebDAV 同步，会自动同步一次'
+                '观看历史，方便其他设备续播。',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  height: 1.6,
+                  height: 1.7,
                 ),
               ),
             ],

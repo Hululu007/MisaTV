@@ -27,7 +27,15 @@ extension _PlayerFlowExt on _PlayerPageState {
       devices: app.lanDiscovery,
       selfName: app.syncDeviceName,
     );
-    if (device == null || !mounted) return;
+    if (device == null) {
+      // 取消了：流转是一次性的，收起发现，不留后台广播。
+      await app.stopFlow();
+      return;
+    }
+    if (!mounted) {
+      await app.stopFlow();
+      return;
+    }
 
     final source = app.preparePlay(current, forceRelay: true);
     final payload = FlowPayload(
@@ -47,6 +55,8 @@ extension _PlayerFlowExt on _PlayerPageState {
     );
     _toast('正在推送到 ${device.name}…');
     final error = await FlowClient.push(device: device, payload: payload);
+    // 无论成败都收起：一次流转用一次，不常驻广播。
+    await app.stopFlow();
     if (!mounted) return;
     if (error != null) {
       _toast('流转失败：$error');

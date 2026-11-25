@@ -147,15 +147,21 @@ Future<void> _bootstrap(List<String> args) async {
   await state.init();
   // 设备流转接收端：别的设备推过来时用它打开播放器。
   // 没有 context，靠全局 navigatorKey；未初始化时回调里会拒收并给出提示。
+  //
+  // 流转是一次性的（像投屏）：不在这里常驻开启 UDP 发现，也不持久化开关。
+  // 发现只在用户点「流转」时临时启动、用完收起。
   FlowReceiver.install(state, navigatorKey: appNavigatorKey);
-  // 自动恢复：上次开着流转的话，启动后重新开启发现（否则对端看不到本机）。
-  if (state.syncSettings.flowEnabled) {
-    unawaited(
-      state.startFlow().catchError((Object e) {
-        AppLog.w('lan', '启动时恢复设备流转失败：$e');
-      }),
-    );
-  }
+  // 常驻「被动就绪」：只在本机监听 HTTP 端点并应答别人的流转探测，
+  // **不广播**。这样即使本机从没点过流转，别的设备也能在列表里找到它；
+  // 反过来，本机点流转前不会有任何外发流量。
+  //
+  // 失败（端口被占用等）只记日志：流转不可用不该影响正常启动。
+  unawaited(
+    state.startLanSyncServer().catchError((Object e) {
+      AppLog.w('lan', '局域网接收端点启动失败（不影响启动）：$e');
+      return 0;
+    }),
+  );
   // 老板键 / 托盘：桌面端初始化；热键被占用等情况只记日志，不影响启动。
   //
   // 注意：托盘图标**不能**在这里同步创建。Windows 上原生托盘需要窗口与消息
