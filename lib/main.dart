@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'app.dart';
+import 'ui/detail_full.dart';
 import 'ui/flow_receiver.dart';
 import 'core/logging/app_log.dart';
 import 'core/net/app_http.dart';
@@ -43,7 +44,32 @@ void main(List<String> args) {
   });
 }
 
-Future<void> _bootstrap(List<String> args) async {
+/// TV 精简版的启动入口，由 `main_tv.dart` 调用。
+///
+/// [rootBuilder] 决定根界面：TV 版传 `TvShell`，且 `main_tv.dart`
+/// **不 import app_shell.dart**，于是常规 UI 页面不会进编译产物。
+void runKniephosTv(
+  List<String> args,
+  Widget Function() rootBuilder, {
+  void Function()? installDetailOpener,
+}) {
+  runZonedGuarded(
+    () => _bootstrap(
+      args,
+      rootBuilder: rootBuilder,
+      installDetailOpener: installDetailOpener,
+    ),
+    (error, stack) {
+      AppLog.e('zone', '未捕获异常', error, stack);
+    },
+  );
+}
+
+Future<void> _bootstrap(
+  List<String> args, {
+  Widget Function()? rootBuilder,
+  void Function()? installDetailOpener,
+}) async {
   WidgetsFlutterBinding.ensureInitialized();
   // 必须在任何 HttpClient 创建之前安装：之后 Dart / package:http 的网络请求
   // 都会按当前代理配置自动走本机 HTTP 代理桥（未启用时返回 DIRECT）。
@@ -145,6 +171,12 @@ Future<void> _bootstrap(List<String> args) async {
   // 播放失败时由 AppState 按需刷新网盘会话（夸克 `/member` 补发新 `__puus`）。
   sourceService.jar.refreshDriveSession = state.refreshDriveSession;
   await state.init();
+  // 沉浸界面点海报时跳哪个详情页：全功能版用完整的 DetailPage，
+  // TV 版让入口传入 installTvDetailOpener（见 ui/detail_tv.dart）。
+  //
+  // 注意这里**不能**无条件调用 installFullDetailOpener：那会让 detail_full.dart
+  // 进 TV 构建的依赖闭包，把 4152 行的常规详情页又拖回来。
+  (installDetailOpener ?? installFullDetailOpener)();
   // 设备流转接收端：别的设备推过来时用它打开播放器。
   // 没有 context，靠全局 navigatorKey；未初始化时回调里会拒收并给出提示。
   //
@@ -280,7 +312,7 @@ Future<void> _bootstrap(List<String> args) async {
     onClosed: state.reloadUserDataFromStore,
   );
 
-  runApp(KniephosApp(state: state));
+  runApp(KniephosApp(state: state, rootBuilder: rootBuilder));
   // 首帧之后才初始化托盘 / 老板键：此时窗口与消息循环都已就绪，
   // 原生托盘 API 才能安全调用（原因见上面 `bossKey` 处的注释）。
   if (bossKey != null) {

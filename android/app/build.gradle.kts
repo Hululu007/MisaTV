@@ -143,16 +143,16 @@ android {
         }
         resources {
             // 安卓端**永远**不需要这些，打进去只是白占体积：
-            //   · assets/jvm/**     桌面端 JRE 用的 shim jar。安卓走 ART / DexClassLoader，
-            //                       JvmRuntime.jarSpiderReady() 对 Android 直接返回 true，
-            //                       这两个目录在安卓上没有任何读取者。
-            //   · assets/aria2/**   Windows 的 aria2c.exe，安卓用内置 BT 实现。
+            //   · jvm/**       桌面端 JRE 用的 shim jar。安卓走 ART / DexClassLoader，
+            //                  JvmRuntime.jarSpiderReady() 对 Android 直接返回 true，
+            //                  这些 jar 在安卓上没有任何读取者。
+            //   · aria2/**     Windows 的 aria2c.exe，安卓用内置 BT 实现。
             //
-            // 注：Gradle 的 resources.excludes 是全局的，无法按 flavor 条件化，
-            // 所以这里只排除「安卓上确定无用」的内容；TV 版的字体裁剪交给
-            // CI 打包脚本处理（见 .github/workflows/build-android.yml）。
-            excludes += "assets/jvm/**"
-            excludes += "assets/aria2/**"
+            // **路径前缀必须是 `assets/flutter_assets/`**：Flutter 会把 pubspec 里
+            // 声明的 assets 复制到 APK 的这个目录下，而不是 APK 根部的 `assets/`。
+            // 写成 `assets/jvm/**` 一条都匹配不上（实测残留 0.4 MB 才发现的）。
+            excludes += "assets/flutter_assets/assets/jvm/**"
+            excludes += "assets/flutter_assets/assets/aria2/**"
         }
     }
 
@@ -205,7 +205,8 @@ chaquopy {
             install("pycryptodome==3.21.0")
             install("pyquery")
             install("cssselect")
-            install("chardet")
+            // chardet 与 charset_normalizer 功能重复，且 python_runner 的基础库
+            // 只用后者（requests 会自动挑可用的那个）。去掉可省约 1 MB。
             install("requests-toolbelt")
             install("typing_extensions")
             install("websocket-client")

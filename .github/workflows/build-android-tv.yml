@@ -115,8 +115,14 @@ jobs:
           # flutter build 默认也会跑 pub get，这里显式写一次让意图更明确，
           # 也避免某些 Flutter 版本缓存了旧的 asset 清单。
           flutter pub get
+          # --target main_tv.dart 是体积优化的关键：
+          # 它只 import ui/shell/tv_shell.dart，不碰 app_shell.dart，
+          # 于是六个常规页面（约 7600 行）不进编译单元。
+          # （Dart 的 tree-shaking 不跨 import 剪枝，靠运行时 if (kMisaTv)
+          #   是省不掉这部分体积的。）
           flutter build apk --release \
             --flavor tv \
+            --target main_tv.dart \
             --target-platform android-arm64 \
             --dart-define=MISA_TV=true
 

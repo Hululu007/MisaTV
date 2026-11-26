@@ -22,8 +22,11 @@ import os
 import re
 import sys
 
-KEEP_WEIGHT = "400"
-KEEP_FILE = "MiSans-Regular.ttf"
+# TV 版**完全不打包** MiSans：改用系统字体（AppTheme.fontFamily 在 TV 版返回
+# null，Flutter 走平台默认字体，中文由系统渲染，显示正常）。
+# 这样能省 5.3 MB —— 比只留一个 Regular 更彻底。
+KEEP_WEIGHT = None
+KEEP_FILE = None
 FONT_DIR = os.path.join("assets", "fonts")
 PUBSPEC = "pubspec.yaml"
 
@@ -48,7 +51,7 @@ def trim_pubspec() -> tuple[int, list[str]]:
 
     def repl(m: re.Match[str]) -> str:
         block = m.group(0)
-        if m.group("weight").strip() == KEEP_WEIGHT:
+        if KEEP_WEIGHT is not None and m.group("weight").strip() == KEEP_WEIGHT:
             kept.append(block)
             return block
         removed.append(block.strip().splitlines()[0])
@@ -63,6 +66,15 @@ def trim_pubspec() -> tuple[int, list[str]]:
             file=sys.stderr,
         )
         raise SystemExit(1)
+
+    # TV 版一个字重都不留时，把空的 fonts: 段整体去掉（否则 Flutter 会报
+    # 「family MiSans 没有声明任何字体」）。
+    if KEEP_WEIGHT is None:
+        out = re.sub(
+            r"[ ]*fonts:\n(?:[ ]*#.*\n)*[ ]*- family: MiSans\n[ ]*fonts:\n",
+            "",
+            out,
+        )
 
     with open(PUBSPEC, "w", encoding="utf-8", newline="") as f:
         f.write(out)
@@ -80,7 +92,7 @@ def trim_files() -> list[str]:
     for name in sorted(os.listdir(FONT_DIR)):
         if not name.startswith("MiSans-"):
             continue
-        if name == KEEP_FILE:
+        if KEEP_FILE is not None and name == KEEP_FILE:
             continue
         path = os.path.join(FONT_DIR, name)
         if not os.path.isfile(path):
@@ -103,10 +115,11 @@ def main() -> int:
         print(f"  - {f}")
 
     # 一致性检查：pubspec 保留的条目必须有对应文件，否则下游构建会失败
-    keep_path = os.path.join(FONT_DIR, KEEP_FILE)
-    if not os.path.isfile(keep_path):
-        print(f"错误：保留的字体文件不存在：{keep_path}", file=sys.stderr)
-        return 1
+    if KEEP_FILE is not None:
+        keep_path = os.path.join(FONT_DIR, KEEP_FILE)
+        if not os.path.isfile(keep_path):
+            print(f"错误：保留的字体文件不存在：{keep_path}", file=sys.stderr)
+            return 1
 
     remaining = [n for n in os.listdir(FONT_DIR) if n.startswith("MiSans-")]
     print(f"assets/fonts 剩余 MiSans 文件：{remaining}")

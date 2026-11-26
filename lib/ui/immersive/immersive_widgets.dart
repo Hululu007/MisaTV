@@ -9,9 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../models/vod.dart';
 import '../../services/discover/cover_images.dart';
 import '../../services/fonts/hero_fonts.dart';
-import '../../core/app_variant.dart';
-import '../pages/detail_page.dart';
-import '../tv_detail_page.dart';
+import '../detail_opener.dart';
 import '../widgets/mouse_drag_scroll.dart';
 import 'designed_title.dart';
 import 'hero_title_style.dart';
@@ -1389,15 +1387,10 @@ void openImmersiveItem(
     app.requestSearch(item.name);
     return;
   }
-  // TV 精简版不编译常规 DetailPage（两千多行 + 剧照/演职员/影评等请求），
-  // 换成只保留「海报 + 简介 + 选集 + 播放」的版本。
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => kMisaTv
-          ? TvDetailPage(item: item, autoPlay: autoPlay, fromStart: fromStart)
-          : DetailPage(item: item, autoPlay: autoPlay, fromStart: fromStart),
-    ),
-  );
+  // 详情页的具体实现由各入口注入（见 ui/detail_opener.dart）：
+  // 全功能版是 pages/detail_page.dart，TV 版是 tv_detail_page.dart。
+  // 这里只依赖注入点，避免把 4000 多行的常规详情页拖进 TV 构建。
+  openImmersiveDetail(context, item, autoPlay: autoPlay, fromStart: fromStart);
 }
 
 /// 沉浸模式统一的上下文菜单：长按、遥控器菜单键、右键都会打开它。
