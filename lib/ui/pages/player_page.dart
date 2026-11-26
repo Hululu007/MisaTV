@@ -3867,8 +3867,11 @@ class _PlayerPageState extends State<PlayerPage>
                               ),
                             ),
                             // 设备流转：把这一集推给局域网内另一台 MisaTV。
-                            // 桌面 + 移动端都提供（用户要求全平台互通）。
-                            if (!_live)
+                            //
+                            // TV 版**只保留接收**、不提供推送：电视通常是被推的
+                            // 那一端（手机/电脑上选片更方便），而且推送逻辑会把
+                            // flow_client 与整个发现流程拉进编译单元。
+                            if (!_live && !kMisaTv)
                               TextButton.icon(
                                 onPressed: _flowToDevice,
                                 icon: const Icon(
