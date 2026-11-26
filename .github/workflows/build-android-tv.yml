@@ -120,11 +120,26 @@ jobs:
           # 于是六个常规页面（约 7600 行）不进编译单元。
           # （Dart 的 tree-shaking 不跨 import 剪枝，靠运行时 if (kMisaTv)
           #   是省不掉这部分体积的。）
-          flutter build apk --release \
-            --flavor tv \
-            --target lib/main_tv.dart \
-            --target-platform android-arm64 \
-            --dart-define=MISA_TV=true
+          # 重试整条构建命令：Maven Central 对 GitHub runner 的共享 IP 限流，
+          # 偶发返回 429。Gradle 内部重试（gradle.properties 的 max.retries）
+          # 只能吸收一部分，遇到「插件仓库被禁用」这种硬失败时仍需整条重来。
+          for attempt in 1 2 3; do
+            echo "--- 构建尝试 $attempt"
+            if flutter build apk --release \
+                 --flavor tv \
+                 --target lib/main_tv.dart \
+                 --target-platform android-arm64 \
+                 --dart-define=MISA_TV=true; then
+              echo "构建成功（第 $attempt 次）"
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::第 $attempt 次构建失败，30 秒后重试"
+              sleep 30
+            fi
+          done
+          echo "::error::连续 3 次构建失败"
+          exit 1
 
       - name: Verify APK is signed with the release keystore
         shell: bash
